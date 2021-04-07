@@ -9,4 +9,6 @@ comments: false
 ![labimage](/assets/img/labimg_cropped.jpg){:class="img-responsive"}
 
 ## About Me
-I'm an MD/PhD student at Washington University in St. Louis.  My interests include systems neuroscience, data science, and psychiatry.  I study the dynamics of large populations of neurons in behaving rodents, and how these dynamics are disrupted in diseases such as Alzheimer's Disease in the [Hengen lab](https://hengenlab.org).  I also occassionally write about medicine and make electronic music.
+Hi!  My name is Sam and I'm an MD/PhD student at Washington University in St. Louis.  My research interests include systems neuroscience, data science, and psychiatry.  As a student in the [Hengen lab](https://hengenlab.org), I study the dynamics of large populations of neurons in behaving rodents and how these dynamics are disrupted in conditions such as Alzheimer's Disease.  You can peruse my scholarly works on my [Google Scholar](https://scholar.google.com/citations?user=aS5SFZcAAAAJ&hl=en) page.
+
+For fun, my creative pursuits include narrative medicine and producing electronic music.  If you're interested, you can read some of my writing in [this anthology](https://www.amazon.com/Human-Tomorrows-Doctors-Tolu-Kehinde/dp/1512603333) or in the [Hippocrene](https://cpb-us-w2.wpmucdn.com/sites.wustl.edu/dist/7/1374/files/2018/07/Hippocrene-2016-16rwxec.pdf), Wash U med's arts magazine.
