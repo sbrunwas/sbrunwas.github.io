@@ -1,7 +1,7 @@
 ---
 layout: page
 title: Samuel Brunwasser
-tags: [about, Jekyll, theme, moon]
+tags: [MD/PhD, medicine, neuroscience, electrophysiology, psychiatry]
 date: 2016-03-21
 comments: false
 ---
