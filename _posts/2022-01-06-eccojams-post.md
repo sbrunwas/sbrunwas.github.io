@@ -4,10 +4,10 @@ title: ECCOJAMS
 date: 2022-01-06
 excerpt: "The greatest hits of my PhD in a Python package."
 tags: [Python, neural data, spikes, package, lab]
-comments: true
+comments: false
 ---
 
-One of the unique experiences (and occassional headaches) of being the first grad student in my PhD lab was that if there was an analysis I needed to do, I often had to write the basic scripts to do it from scratch.  Occasionally I found repo's from other labs with useful code.  But inevitably there were times I had to get my hands dirty and write the code myself.  (And I admit I have a bit of an addiction to trying to figure out how to get analyses to work).
+One of the unique experiences (and occassional headaches) of being the first grad student in my PhD lab was that if there was an analysis I needed to do, I often had to write the basic scripts to do it from scratch.  Occasionally I found repo's from other labs with useful code.  But inevitably there were times I had to get my hands dirty and write the code myself.  (Okay yes I like getting my hands dirty).
 
 Well now that I recently defended, I thought it would be a good time to compile my "top hits" of scripts I wrote throughout my PhD for the analysis of chronic single unit and behavior data.  I've put it together into a Python package I'm calling Eccojams.  Click the dolphin below to check it out!
 
