@@ -7,30 +7,10 @@ tags: [humanities, narrative medicine, NICU, palliative]
 comments: false
 ---
 
-An accident in utero
-left you outside in
-and your life outside became destined
-for tubes and oscillators.
-
-Your mother on the outside -
-We call her in
-but she can’t see what we see.
-
-If I could see outside
-what would I see?
-Tears. Prayers.
-I try to invite her in.
-I ask her about the scripture
-on the wall of your room.
-
-Specialists on the outside
-keep coming in
-to pronounce you dead.
-We see through each other.
-
-I can't help but feel
-that I’m the outsider.
-
-Like a lighthouse
-guiding a ship into the harbor,
-but never touching the water myself.
+<p>&nbsp;</p>
+<p>An accident in utero<br />left you outside in<br />and your life outside became destined<br />for tubes and oscillators.</p>
+<p>Your mother on the outside -<br />We call her in<br />but she can&rsquo;t see what we see.</p>
+<p>If I could see outside<br />what would I see?<br />Tears. Prayers.<br />I try to invite her in.<br />I ask her about the scripture<br />on the wall of your room.</p>
+<p>Specialists on the outside<br />keep coming in<br />to pronounce you dead.<br />We see through each other.</p>
+<p>I can't help but feel<br />that I&rsquo;m the outsider.</p>
+<p>Like a lighthouse<br />guiding a ship into the harbor,<br />but never touching the water myself.</p>
