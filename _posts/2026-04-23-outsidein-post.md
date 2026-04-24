@@ -3,7 +3,7 @@ layout: post
 title: Outside In
 date: 2026-04-23
 excerpt: "Poem I wrote during my first NICU shift intern year"
-tags: [poem, narrative medicine, NICU]
+tags: [humanities, narrative medicine, NICU, palliative]
 comments: false
 ---
 
