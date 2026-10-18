@@ -1,4 +1,4 @@
-# BASS-01 sequencer 4/8-step options deployed 2026-10-18
+# ClawStudio v0.8 · JP-style Poly, Waldorf-style Texture, 303-style Acid
 name: Publish ClawStudio
 on:
   push:
@@ -20,11 +20,18 @@ jobs:
           persist-credentials: true
       - name: Fetch integrated ClawStudio and original local audio engine
         run: |
-          git clone --depth 1 --branch clawstudio-bass01-v07 https://github.com/sbrunwas/afterglow.git "$RUNNER_TEMP/afterglow"
+          git clone --depth 1 --branch clawstudio-rack-poly-texture-acid-v08 https://github.com/sbrunwas/afterglow.git "$RUNNER_TEMP/afterglow"
           mkdir -p clawstudio
           cp "$RUNNER_TEMP/afterglow/web/dist/clawstudio.html" clawstudio/index.html
           cp "$RUNNER_TEMP/afterglow/web/dist/bass01.js" clawstudio/bass01.js
           cp "$RUNNER_TEMP/afterglow/web/dist/bass01.css" clawstudio/bass01.css
+          cp "$RUNNER_TEMP/afterglow/web/dist/rack-devices.js" clawstudio/rack-devices.js
+          cp "$RUNNER_TEMP/afterglow/web/dist/rack-devices.css" clawstudio/rack-devices.css
+          cp "$RUNNER_TEMP/afterglow/web/dist/devices.html" clawstudio/devices.html
+          for device in poly texture acid303; do
+            mkdir -p "clawstudio/$device"
+            cp "$RUNNER_TEMP/afterglow/web/dist/$device/index.html" "clawstudio/$device/index.html"
+          done
           mkdir -p clawstudio/bass01
           cp "$RUNNER_TEMP/afterglow/web/dist/bass01/index.html" clawstudio/bass01/index.html
           for file in afterglow.wasm audio.js state.js worklet.js wasm-runtime.js; do
@@ -36,14 +43,14 @@ jobs:
           cp "$RUNNER_TEMP/afterglow/web/dist/LinnDrum-NOTICE.txt" clawstudio/LinnDrum-NOTICE.txt
           cp "$RUNNER_TEMP/afterglow/web/dist/Schwung-GPL-LICENSE.txt" clawstudio/Schwung-GPL-LICENSE.txt
           cp "$RUNNER_TEMP/afterglow/web/dist/DaisySP-LICENSE.txt" clawstudio/DaisySP-LICENSE.txt
-          printf '%s\n' '# ClawStudio' 'Browser-based modular performance studio. Original drum synthesis is packaged locally as WebAssembly; no fallback engine.' 'Source: https://github.com/sbrunwas/afterglow/tree/clawstudio-bass01-v07' > clawstudio/README.md
+          printf '%s\n' '# ClawStudio' 'Browser-based modular performance studio. Original drum synthesis is packaged locally as WebAssembly; no fallback engine.' 'Source: https://github.com/sbrunwas/afterglow/tree/clawstudio-rack-poly-texture-acid-v08' > clawstudio/README.md
       - name: Commit the self-contained static site
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add clawstudio/
           if ! git diff --cached --quiet; then
-            git commit -m 'Publish ClawStudio with BASS-01 and original drum engine'
+            git commit -m 'Publish ClawStudio poly, texture, acid and original instruments'
             git push
           else
             echo 'ClawStudio is already up to date'
