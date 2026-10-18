@@ -1,3 +1,4 @@
+# BASS-01 sequencer 4/8-step options deployed 2026-10-18
 name: Publish ClawStudio
 on:
   push:
