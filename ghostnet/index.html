@@ -54,7 +54,25 @@ function playLane(l,t,weight,full=false){if(!l.audio||!audible(l)||weight<.01)re
  s.onended=()=>{s.disconnect();grain.disconnect();f.disconnect();g.disconnect();pan.disconnect()};
  }
 }
-function tick(){if(!playing)return;while(next<ctx.currentTime+.13){let s=step;lanes.forEach((l,i)=>{if(!l.audio||!l.seq[s]||!audible(l))return;let m=+$('morph').value/100,other=lanes[(i+1)%4];playLane(l,next,other.audio&&audible(other)?Math.cos(m*Math.PI/2):1);if(other.audio&&audible(other))playLane(other,next,Math.sin(m*Math.PI/2))});step=(step+1)%patternLength;next+=60/(+$('bpm').value)/4}lanes.forEach(l=>[...l.el.querySelectorAll('.seq button')].forEach((b,j)=>b.classList.toggle('now',j===((step+patternLength-1)%patternLength)));$('stepReadout').textContent='STEP '+String(((step+patternLength-1)%patternLength)+1).padStart(2,'0')+' / '+patternLength)}
+function tick(){
+ if(!playing)return;
+ while(next<ctx.currentTime+.13){
+  const s=step;
+  lanes.forEach((l,i)=>{
+   if(!l.audio||!l.seq[s]||!audible(l))return;
+   const m=+$('morph').value/100,other=lanes[(i+1)%4];
+   playLane(l,next,other.audio&&audible(other)?Math.cos(m*Math.PI/2):1);
+   if(other.audio&&audible(other))playLane(other,next,Math.sin(m*Math.PI/2));
+  });
+  step=(step+1)%patternLength;
+  next+=60/(+$('bpm').value)/4;
+ }
+ const visible=(step+patternLength-1)%patternLength;
+ lanes.forEach(l=>{
+  l.el.querySelectorAll('.seq button').forEach((button,j)=>button.classList.toggle('now',j===visible));
+ });
+ $('stepReadout').textContent='STEP '+String(visible+1).padStart(2,'0')+' / '+patternLength;
+}
 function halt(){playing=false;if(timer)clearInterval(timer);timer=null;lanes.forEach(l=>l.el.querySelectorAll('.seq button').forEach(b=>b.classList.remove('now')))}
 
 const laneLoading=new Set();
