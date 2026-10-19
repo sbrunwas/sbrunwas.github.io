@@ -1,4 +1,4 @@
-# ClawStudio v0.13 · Poly scale arpeggiator and kick sidechain
+# ClawStudio v0.13 · Poly harmonic arpeggiator, touch editing and kick sidechain (final)
 name: Publish ClawStudio
 on:
   push:
