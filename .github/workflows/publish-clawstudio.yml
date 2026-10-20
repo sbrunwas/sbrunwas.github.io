@@ -1,4 +1,4 @@
-# ClawStudio v0.20 · Mono DSP cleanup and tuned Blue Hour bass
+# ClawStudio v0.21 · audit-tested publishing gate
 name: Publish ClawStudio
 on:
   push:
@@ -20,7 +20,7 @@ jobs:
           persist-credentials: true
       - name: Fetch integrated ClawStudio and original local audio engine
         run: |
-          git clone --depth 1 --branch clawstudio-mono-dsp-clarity-v20 https://github.com/sbrunwas/afterglow.git "$RUNNER_TEMP/afterglow"
+          git clone --depth 1 --branch clawstudio-v21-audit-hardening https://github.com/sbrunwas/afterglow.git "$RUNNER_TEMP/afterglow"
           mkdir -p clawstudio
           cp "$RUNNER_TEMP/afterglow/web/dist/clawstudio.html" clawstudio/index.html
           cp "$RUNNER_TEMP/afterglow/web/dist/bass01.js" clawstudio/bass01.js
@@ -39,7 +39,7 @@ jobs:
           done
           mkdir -p clawstudio/bass01
           cp "$RUNNER_TEMP/afterglow/web/dist/bass01/index.html" clawstudio/bass01/index.html
-          for file in afterglow.wasm audio.js state.js worklet.js wasm-runtime.js; do
+          for file in afterglow.wasm audio.js state.js worklet.js wasm-runtime.js render-worker.js clawstudio-capture.worklet.js; do
             cp "$RUNNER_TEMP/afterglow/web/dist/$file" "clawstudio/$file"
           done
           cp "$RUNNER_TEMP/afterglow/web/dist/ENGINE-NOTES.md" clawstudio/ENGINE-NOTES.md
@@ -48,7 +48,7 @@ jobs:
           cp "$RUNNER_TEMP/afterglow/web/dist/LinnDrum-NOTICE.txt" clawstudio/LinnDrum-NOTICE.txt
           cp "$RUNNER_TEMP/afterglow/web/dist/Schwung-GPL-LICENSE.txt" clawstudio/Schwung-GPL-LICENSE.txt
           cp "$RUNNER_TEMP/afterglow/web/dist/DaisySP-LICENSE.txt" clawstudio/DaisySP-LICENSE.txt
-          printf '%s\n' '# ClawStudio' 'Browser-based modular performance studio. Original drum synthesis is packaged locally as WebAssembly; no fallback engine.' 'Source: https://github.com/sbrunwas/afterglow/tree/clawstudio-mono-dsp-clarity-v20' > clawstudio/README.md
+          printf '%s\n' '# ClawStudio' 'Browser-based modular performance studio. Original drum synthesis is packaged locally as WebAssembly; no fallback engine.' 'Source: https://github.com/sbrunwas/afterglow/tree/clawstudio-v21-audit-hardening' > clawstudio/README.md
       - name: Commit the self-contained static site
         run: |
           git config user.name 'github-actions[bot]'
