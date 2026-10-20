@@ -2,6 +2,7 @@
 // Three playable instrument modules share the host AudioContext, transport and routing.
 import {newPolyArp,arpEventsAtStep} from './poly-arp.js';
 import {attachPolyArp} from './poly-arp-ui.js';
+import {clawPatchbay} from './poly-modular.js';
 import {buchlaParamDefaults,BUCHLA_DEFAULT_ROUTES,attachBuchlaPanel,patchModulation} from './texture-patch.js';
 const TAU=2*Math.PI, cap=(n,a=0,b=1)=>Math.max(a,Math.min(b,n)), hz=n=>440*Math.pow(2,(n-69)/12);
 const midiName=n=>['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][((n%12)+12)%12]+(Math.floor(n/12)-1);
@@ -128,12 +129,18 @@ function createEnsemble(ctx,input,dest){
  return {wet,leftLfo,rightLfo,leftDepth,rightDepth,dispose(){leftLfo.stop();rightLfo.stop();wet.disconnect()}};
 }
 class PolyEngine{
- constructor(ctx,dest,params){this.ctx=ctx;this.p=params;this.fx=makeFX(ctx,dest,.09);this.ensemble=createEnsemble(ctx,this.fx.input,dest);this.voices=[];this.update()}
+ constructor(ctx,dest,params){this.ctx=ctx;this.p=params;this.fx=makeFX(ctx,dest,.09);this.ensemble=createEnsemble(ctx,this.fx.input,dest);this.voices=[];this.patchRoutes=[];this.patchRates=clawPatchbay.ratesSafe();this.update()}
  update(){const p=this.p,t=this.ctx.currentTime;this.fx.wet.gain.setTargetAtTime(p.chorus*.055,t,.05);this.ensemble.wet.gain.setTargetAtTime(p.chorus*.46,t,.04);this.ensemble.leftLfo.frequency.setTargetAtTime(.16+p.modRate*.8,t,.08);this.ensemble.rightLfo.frequency.setTargetAtTime(.22+p.modRate*.94,t,.08);this.ensemble.leftDepth.gain.setTargetAtTime(.001+p.motion*.007,t,.08);this.ensemble.rightDepth.gain.setTargetAtTime(.001+p.motion*.009,t,.08);this.fx.delayWet.gain.setTargetAtTime(p.delay*.36,t,.05);this.fx.feed.gain.setTargetAtTime(.16+p.delay*.45,t,.05)}
+ setPatch(routes,rates){
+   this.patchRoutes=clawPatchbay.routesSafe(routes,'poly');
+   this.patchRates=clawPatchbay.ratesSafe(rates);
+   for(const v of this.voices){v.cv?.setRoutes(this.patchRoutes);v.cv?.setRates(this.patchRates)}
+ }
+ setPatchRates(rates){this.patchRates=clawPatchbay.ratesSafe(rates);for(const v of this.voices)v.cv?.setRates(this.patchRates)}
  note(midi,t,dur,velocity=1){const p=this.p,ctx=this.ctx,f=hz(midi),attack=p.attack,release=p.release;
 // Eight-voice polyphony cap with gentle voice stealing.
- this.voices=this.voices.filter(v=>v.end>ctx.currentTime);
- if(this.voices.length>=8){const oldest=this.voices.shift();oldest.amp.gain.cancelScheduledValues(t);oldest.amp.gain.setTargetAtTime(.0001,t,.007);}
+ this.voices=this.voices.filter(v=>{if(v.end>ctx.currentTime)return true;v.cv?.dispose();return false});
+ if(this.voices.length>=8){const oldest=this.voices.shift();oldest.cv?.dispose();oldest.amp.gain.cancelScheduledValues(t);oldest.amp.gain.setTargetAtTime(.0001,t,.007);}
  const cut=ctx.createBiquadFilter();cut.type='lowpass';cut.frequency.setValueAtTime(ease(p.cutoff,110,18500),t);cut.Q.value=.65+p.res*14;
  const out=ctx.createGain();out.gain.value=.5;const amp=ctx.createGain();amp.gain.value=.0001;cut.connect(amp);amp.connect(out);out.connect(this.fx.input);
 let peak=ease(p.cutoff,100,18000),high=Math.min(18000,peak*(1+p.env*3.5));cut.frequency.setValueAtTime(high,t);cut.frequency.setTargetAtTime(peak,t+.008,Math.max(.02,p.decay*.5));
@@ -159,8 +166,17 @@ for(let i=0;i<layers;i++){
  const phaseHeadroom=1/Math.max(1,o.frequency.value);
  o.start(Math.max(ctx.currentTime,t-Math.random()*phaseHeadroom));o.stop(end+.04);oscs.push(o)}
  const second=oscillator(ctx,p.osc2==='PULSE'?'square':p.osc2==='TRI'?'triangle':'sawtooth',f*2**((p.shape-.5)*.3),t,end+.04,.22,src);
- this.voices.push({end,amp,osc:oscs});}
- dispose(){this.ensemble.dispose();this.fx.input.disconnect();this.fx.wet.disconnect();this.fx.delayWet.disconnect()}
+ const previous=this.voices.slice().reverse().find(v=>v.end>t&&v.osc?.length);
+ const cv=clawPatchbay.makeAudio(ctx,'poly',{
+    'LP FREQ':cut.frequency,'PITCH':oscs.map(o=>o.detune).concat([second.detune]),
+    'OSC2 PITCH':second.detune,'RESONANCE':cut.Q,'LEVEL':out.gain
+ },{routes:this.patchRoutes,rates:this.patchRates},{startAt:t,stopAt:end+.08,
+    seed:(midi*2654435761+Math.round(t*ctx.sampleRate))>>>0,
+    previousVoice:previous?{oscillator:previous.osc[0],envelope:previous.cv?.getSource('ENV')}:null});
+ cv.noteOn(t,dur,{attack:.003+p.attack*p.attack*1.8,decay:.025+p.decay*p.decay*2,
+   sustain:p.sustain,release:.035+p.release*p.release*4,velocity});
+ this.voices.push({end,amp,osc:oscs,cv});}
+ dispose(){for(const v of this.voices)v.cv?.dispose();this.voices=[];this.ensemble.dispose();this.fx.input.disconnect();this.fx.wet.disconnect();this.fx.delayWet.disconnect()}
 }
 // Six complementary engines deliberately use DIFFERENT synthesis paths.
 // Unlike firmware emulation, these are original WebAudio algorithms inspired by
@@ -302,7 +318,7 @@ function makePolyPanel(cfg,p){
  </div><div class="jp-panel-note"><span>POLY-01 <b>VIRTUAL ANALOG SYNTHESIZER</b></span><span>DRAG KNOBS · SHIFT FOR FINE · DOUBLE-CLICK TO RESET</span></div>`;
 }
 export function createRackInstrument(mount,type,{externalClock=false,tempo=()=>126,getContext=null,getDestination=null}={}){
- if(!CONFIG[type])throw Error('Unknown rack module');const cfg=CONFIG[type],p={...cfg.preset},state={p,steps:type==='acid'?16:8,pattern:0,patterns:Array.from({length:8},()=>freshSteps(type)),root:type==='texture'?48:type==='poly'?60:36,polyArp:type==='poly'?newPolyArp():null,patchRoutes:type==='texture'?BUCHLA_DEFAULT_ROUTES():null,active:true};let ctx=null,engine=null,running=false,interval=null,position=0,next=0,selected=0,history=[],currentPreset='',status='',lastSeq=-1;
+ if(!CONFIG[type])throw Error('Unknown rack module');const cfg=CONFIG[type],p={...cfg.preset},state={p,steps:type==='acid'?16:8,pattern:0,patterns:Array.from({length:8},()=>freshSteps(type)),root:type==='texture'?48:type==='poly'?60:36,polyArp:type==='poly'?newPolyArp():null,polyMod:type==='poly'?{routes:[],rates:clawPatchbay.ratesSafe()}:null,patchRoutes:type==='texture'?BUCHLA_DEFAULT_ROUTES():null,active:true};let ctx=null,engine=null,running=false,interval=null,position=0,next=0,selected=0,history=[],currentPreset='',status='',lastSeq=-1;
  const $=sel=>mount.querySelector(sel),$$=sel=>[...mount.querySelectorAll(sel)],presets=INSTRUMENT_PRESETS[type];
  const title=type==='poly'?'POLY-01':type==='texture'?'μQ · MUTATION LAB':'BASS LINE · 303';
  const pSelect=presets.map((x,i)=>`<option value="${i}">${x[0]}</option>`).join('');
@@ -311,6 +327,23 @@ export function createRackInstrument(mount,type,{externalClock=false,tempo=()=>1
 
  mount.innerHTML=`<div class="cri cri-${type}" style="--accent:${cfg.color}"><div class="cri-rack-ear">●<span>●</span></div><header class="cri-head"><div><span class="cri-kicker">CLAWSTUDIO · SYNTHESIS LAB / ${type.toUpperCase()}</span><h2>${title}</h2><p>${cfg.subtitle}</p></div><div class="cri-display"><div>${cfg.name} <em>REV 01</em></div><strong id="cri-patchname">${presets[0][0]}</strong><small>INDEPENDENT CLOCK · MIXER OUTPUT</small></div></header><div class="cri-toolbar"><label>PATCH <select id="cri-presets">${pSelect}</select></label><button id="cri-prev">◀</button><button id="cri-next">▶</button><button id="cri-rand">${type==='texture'?'MUTATE':'VARIATION'} ↝</button><button id="cri-undo">UNDO</button>${type==='texture'?'<label class="cri-lock">MUTATION <select id="cri-mutate-scope"><option value="TWEAK">TWEAK</option><option value="TIMBRE">TIMBRE</option><option value="WILD">WILD</option></select></label><label class="cri-lock"><input id="cri-lock-engine" type="checkbox"> LOCK ENGINE</label><label class="cri-lock"><input id="cri-lock-filter" type="checkbox"> LOCK FILTER</label><label class="cri-lock"><input id="cri-lock-env" type="checkbox"> LOCK ENVS</label>':''}<button id="cri-jam">▶ AUDITION</button>${type==='texture'?'<button id="cri-hit" title="Hear this patch instantly">♪ HEAR PATCH</button>':''}</div><div class="cri-controls">${type==='poly'?makePolyPanel(cfg,p):`<div class="cri-feature"><div class="cri-striplabel">${type==='texture'?'WAVETABLE / MODULATION PATH':'ANALOG VOICE / ACID CONTOUR'}</div><div class="cri-selectors">${selectors}</div>${type==='texture'?'<div class="cri-waveform"><canvas class="cri-wave" width="680" height="115"></canvas><span>SPECTRAL EVOLUTION / WAVETABLE POSITION</span></div>':''}<div class="cri-knobs">${knobs}</div></div>`}</div><div class="cri-sequencer"><div class="cri-seqbar"><strong>${type==='acid'?'303 / STEP PROGRAMMING':'PATTERN / PERFORMANCE MEMORY'}</strong><div><label>PATTERN <select id="cri-pattern">${Array.from({length:8},(_,i)=>`<option value="${i}">${String(i+1).padStart(2,'0')}</option>`).join('')}</select></label><label>STEPS <select id="cri-length">${[4,8,16,32,64].map(n=>`<option value="${n}">${n}</option>`).join('')}</select></label><label>PAGE <select id="cri-page">${[1,2,3,4].map((n,i)=>`<option value="${i}">${String(n).padStart(2,'0')}</option>`).join('')}</select></label><label>ROOT <select id="cri-root">${Array.from({length:73},(_,i)=>`<option value="${12+i}">${midiName(i+12)}</option>`).join('')}</select></label><button id="cri-stepsrnd">RND NOTES</button></div></div><div class="cri-stepgrid" id="cri-steps"></div><div class="cri-stepedit"><strong>STEP <span id="cri-selected">01</span></strong><label>NOTE <select id="cri-note">${Array.from({length:61},(_,i)=>`<option value="${i-24}">${midiName(Math.max(0,state.root+i-24))}</option>`).join('')}</select></label><button id="cri-step-on">GATE</button><button id="cri-accent">ACCENT</button><button id="cri-slide">${type==='acid'?'SLIDE':'TIE / LEGATO'}</button><label>GATE LENGTH <input id="cri-gate" type="range" min=".1" max="1" step=".01"></label><button id="cri-save">SAVE</button><button id="cri-load">LOAD</button><input type="file" id="cri-loadfile" accept=".json" hidden></div></div><div class="cri-footer"><span id="cri-status">Try the factory patches, then design your own sound.</span><span>${type==='poly'?'JP BLUE / 7 SAWS · EUROPA-INSPIRED MODIFIERS':type==='texture'?'EVOLVE · MUTATE · KEEP THE HAPPY ACCIDENTS':'CLASSIC ACID · PATTERNS · SLIDE · ACCENT'}</span></div><div class="cri-rack-ear bottom">●<span>●</span></div></div>`;
  const polyArpPanel=type==='poly'?attachPolyArp(mount,state):null;
+ function polyModState(){
+   if(!state.polyMod||typeof state.polyMod!=='object')state.polyMod={routes:[],rates:clawPatchbay.ratesSafe()};
+   state.polyMod.routes=clawPatchbay.routesSafe(state.polyMod.routes,'poly');
+   state.polyMod.rates=clawPatchbay.ratesSafe(state.polyMod.rates);
+   return state.polyMod;
+ }
+ function syncPolyMod(){
+   if(type!=='poly')return;
+   const m=polyModState();engine?.setPatch(m.routes,m.rates);
+ }
+ // A physically separate lower panel; the original JP-inspired synthesizer is untouched above.
+ const polyModPanel=type==='poly'?clawPatchbay.panel(mount.querySelector('.cri'),'poly',{
+   getRoutes:()=>polyModState().routes,
+   setRoutes:r=>{polyModState().routes=clawPatchbay.routesSafe(r,'poly');syncPolyMod()},
+   getRates:()=>polyModState().rates,
+   setRates:r=>{polyModState().rates=clawPatchbay.ratesSafe(r);engine?.setPatchRates(polyModState().rates)}
+ }):null;
  const persistentPatch=state.patchRoutes;
  const buchlaPanel=type==='texture'?attachBuchlaPanel(mount,persistentPatch,p):null;
  let page=0;const val=k=>p[k],syncUI=()=>{$$('[data-knob]').forEach(el=>{let v=cap(p[el.dataset.knob]);el.style.setProperty('--rot',(-135+v*270)+'deg');el.style.setProperty('--v',v);el.setAttribute('aria-valuenow',Math.round(v*100));mount.querySelector(`[data-val="${el.dataset.knob}"]`).textContent=Math.round(v*100)});$$('[data-opt]').forEach(el=>el.value=p[el.dataset.opt]);$$('[data-fader]').forEach(el=>{el.value=p[el.dataset.fader];const output=mount.querySelector(`[data-val="${el.dataset.fader}"]`);if(output)output.textContent=Math.round(p[el.dataset.fader]*100)});$('#cri-length').value=state.steps;$('#cri-pattern').value=state.pattern;$('#cri-root').value=state.root;$('#cri-page').value=page;[...$('#cri-page').options].forEach(o=>o.disabled=+o.value>Math.floor((state.steps-1)/16));showSteps();drawWave();polyArpPanel?.refresh();buchlaPanel?.refresh()};
@@ -352,8 +385,8 @@ export function createRackInstrument(mount,type,{externalClock=false,tempo=()=>1
  $('#cri-stepsrnd').onclick=()=>{for(let i=0;i<state.steps;i++){let s=state.patterns[state.pattern][i];s.note=templates[type][Math.random()*16|0];s.on=Math.random()>(type==='texture'?.72:.38);s.accent=Math.random()<.22;s.slide=Math.random()<.15}showSteps()};
  $('#cri-note').onchange=e=>{state.patterns[state.pattern][selected].note=+e.target.value;showSteps()};$('#cri-gate').oninput=e=>{state.patterns[state.pattern][selected].gate=+e.target.value};for(let [id,k] of [['cri-step-on','on'],['cri-accent','accent'],['cri-slide','slide']])$('#'+id).onclick=()=>{let s=state.patterns[state.pattern][selected];s[k]=!s[k];showSteps()};
  $('#cri-save').onclick=()=>{const blob=new Blob([JSON.stringify({format:'clawstudio-rack-device',version:1,type,state},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`ClawStudio-${type}-patch.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500)};
- $('#cri-load').onclick=()=>$('#cri-loadfile').click();$('#cri-loadfile').onchange=async e=>{try{const obj=JSON.parse(await e.target.files[0].text());if(obj.format!=='clawstudio-rack-device'||obj.type!==type||!obj.state||!Array.isArray(obj.state.patterns)||obj.state.patterns.length!==8)throw Error('Incorrect preset format');Object.assign(state,{...obj.state,p:{...cfg.preset,...obj.state.p}});if(type==='texture'){persistentPatch.splice(0,persistentPatch.length,...(Array.isArray(obj.state.patchRoutes)?obj.state.patchRoutes:BUCHLA_DEFAULT_ROUTES()));state.patchRoutes=persistentPatch;buchlaPanel?.refresh()}if(type==='poly')state.polyArp={...newPolyArp(),...(obj.state.polyArp||{})};Object.assign(p,state.p);if(![4,8,16,32,64].includes(state.steps))state.steps=16;page=0;selected=0;engine?.update?.();syncUI();$('#cri-status').textContent='Patch loaded'}catch(ex){$('#cri-status').textContent='Cannot load: '+ex.message}};
- function init(context,destination){if(engine)return engine;ctx=context;engine=type==='poly'?new PolyEngine(ctx,destination,p):type==='texture'?new TextureEngine(ctx,destination,p):new AcidEngine(ctx,destination,p);if(type==='texture')engine.patchRoutes=persistentPatch;return engine}
+ $('#cri-load').onclick=()=>$('#cri-loadfile').click();$('#cri-loadfile').onchange=async e=>{try{const obj=JSON.parse(await e.target.files[0].text());if(obj.format!=='clawstudio-rack-device'||obj.type!==type||!obj.state||!Array.isArray(obj.state.patterns)||obj.state.patterns.length!==8)throw Error('Incorrect preset format');Object.assign(state,{...obj.state,p:{...cfg.preset,...obj.state.p}});if(type==='texture'){persistentPatch.splice(0,persistentPatch.length,...(Array.isArray(obj.state.patchRoutes)?obj.state.patchRoutes:BUCHLA_DEFAULT_ROUTES()));state.patchRoutes=persistentPatch;buchlaPanel?.refresh()}if(type==='poly'){state.polyArp={...newPolyArp(),...(obj.state.polyArp||{})};polyModState();syncPolyMod();polyModPanel?.refresh()}Object.assign(p,state.p);if(![4,8,16,32,64].includes(state.steps))state.steps=16;page=0;selected=0;engine?.update?.();syncUI();$('#cri-status').textContent='Patch loaded'}catch(ex){$('#cri-status').textContent='Cannot load: '+ex.message}};
+ function init(context,destination){if(engine)return engine;ctx=context;engine=type==='poly'?new PolyEngine(ctx,destination,p):type==='texture'?new TextureEngine(ctx,destination,p):new AcidEngine(ctx,destination,p);if(type==='texture')engine.patchRoutes=persistentPatch;if(type==='poly')syncPolyMod();return engine}
  function scheduleStep(step,t,dur){if(!state.active||!engine)return;let i=step%state.steps,s=state.patterns[state.pattern][i];if(type==='poly'&&state.polyArp?.enabled){for(const event of arpEventsAtStep(state.polyArp,state.root,step,dur))engine.note(event.note,t+event.offset,event.length,event.velocity)}else if(s.on){let note=Math.min(127,Math.max(0,state.root+s.note));const length=Math.max(.06,dur*s.gate);if(type==='poly'){if(p.arp==='CHORD'){for(let n of [0,4,7])engine.note(note+n,t,length)}else if(p.arp==='OFF'){if(i%4===0)engine.note(note,t,length)}else engine.note(note+(p.arp==='DOWN'?(3-i%4)*3:(i%4)*3),t,length)}else if(type==='texture'){const hold=p.pace==='PLUCK'?1.3:p.pace==='PULSE'?2:p.pace==='SWARM'?3.5:6;const gate=length*hold;if(p.arp==='CHORD'){for(let n of [0,4,7])engine.note(note+n,t,gate)}else if(p.arp==='DRIFT'){for(let n of [0,7,12])engine.note(note+n,t,gate)}else if(p.arp==='UP'){engine.note(note+(i%3)*5,t,gate)}else engine.note(note,t,gate)}else {
   const pattern=state.patterns[state.pattern],fromPrevious=acidSlideFromPrevious(pattern,i,state.steps);
   const next=pattern[(i+1)%state.steps];
@@ -368,5 +401,5 @@ export function createRackInstrument(mount,type,{externalClock=false,tempo=()=>1
   engine.note(state.root+state.patterns[state.pattern][selected].note,ctx.currentTime+.035,.3);
   $('#cri-status').textContent='Previewing '+(p.engine||'WAVETABLE')+' · '+currentPreset;
  }catch(e){$('#cri-status').textContent='Audition unavailable: '+e.message}};
- patch(0);state.steps=type==='acid'?16:type==='texture'?16:8;syncUI();return {type,state,init,scheduleStep,stop,dispose:()=>{stop();buchlaPanel?.dispose();engine?.dispose()},setActive:v=>state.active=!!v,getParams:()=>({...p}),getEngine:()=>engine,refreshUI:syncUI};
+ patch(0);state.steps=type==='acid'?16:type==='texture'?16:8;syncUI();return {type,state,init,scheduleStep,stop,dispose:()=>{stop();buchlaPanel?.dispose();polyModPanel?.destroy();engine?.dispose()},setActive:v=>state.active=!!v,getParams:()=>({...p}),getEngine:()=>engine,refreshUI:()=>{syncUI();syncPolyMod();polyModPanel?.refresh()}};
 }
