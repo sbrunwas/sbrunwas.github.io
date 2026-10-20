@@ -58,7 +58,7 @@ jobs:
       - name: Version rack assets for returning sessions
         run: |
           for page in clawstudio/index.html clawstudio/devices.html clawstudio/poly/index.html clawstudio/texture/index.html clawstudio/acid303/index.html; do
-            sed -i 's/rack-devices\\.js/rack-devices.js?v=poly-rack-1/g; s/rack-devices\\.css/rack-devices.css?v=poly-rack-1/g' "$page"
+            sed -i 's/rack-devices[.]js/rack-devices.js?v=poly-rack-1/g; s/rack-devices[.]css/rack-devices.css?v=poly-rack-1/g' "$page"
           done
       - name: Commit the self-contained static site
         run: |
