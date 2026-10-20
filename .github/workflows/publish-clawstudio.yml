@@ -55,6 +55,11 @@ jobs:
           for file in rack-devices.js rack-devices.css; do
             git -C "$RUNNER_TEMP/afterglow" show "1582036167e7c49feea3e67607d2abe926d4ecea:web/dist/$file" > "clawstudio/$file"
           done
+      - name: Version rack assets for returning sessions
+        run: |
+          for page in clawstudio/index.html clawstudio/devices.html clawstudio/poly/index.html clawstudio/texture/index.html clawstudio/acid303/index.html; do
+            sed -i 's/rack-devices\\.js/rack-devices.js?v=poly-rack-1/g; s/rack-devices\\.css/rack-devices.css?v=poly-rack-1/g' "$page"
+          done
       - name: Commit the self-contained static site
         run: |
           git config user.name 'github-actions[bot]'
