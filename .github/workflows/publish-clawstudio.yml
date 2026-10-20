@@ -27,7 +27,7 @@ jobs:
           cp "$RUNNER_TEMP/afterglow/web/dist/bass01.css" clawstudio/bass01.css
           cp "$RUNNER_TEMP/afterglow/web/dist/sampler.js" clawstudio/sampler.js
           cp "$RUNNER_TEMP/afterglow/web/dist/sampler.css" clawstudio/sampler.css
-          for module in poly-arp.js poly-arp-ui.js poly-arp.css sidechain.js texture-patch.js texture-patch.css harmony.js harmony.css project-session.js starter-song.js master-performance.js master-performance.css master-fx-worklet.js; do
+          for module in poly-arp.js poly-arp-ui.js poly-arp.css sidechain.js texture-patch.js texture-patch.css harmony.js harmony.css project-session.js starter-song.js master-performance.js master-performance.css master-fx-worklet.js poly-modular.js poly-modular.css; do
             cp "$RUNNER_TEMP/afterglow/web/dist/$module" "clawstudio/$module"
           done
           cp "$RUNNER_TEMP/afterglow/web/dist/rack-devices.js" clawstudio/rack-devices.js
@@ -49,16 +49,10 @@ jobs:
           cp "$RUNNER_TEMP/afterglow/web/dist/Schwung-GPL-LICENSE.txt" clawstudio/Schwung-GPL-LICENSE.txt
           cp "$RUNNER_TEMP/afterglow/web/dist/DaisySP-LICENSE.txt" clawstudio/DaisySP-LICENSE.txt
           printf '%s\n' '# ClawStudio' 'Browser-based modular performance studio. Original drum synthesis is packaged locally as WebAssembly; no fallback engine.' 'Source: https://github.com/sbrunwas/afterglow/tree/clawstudio-mono-dsp-clarity-v20' > clawstudio/README.md
-      - name: Overlay Poly rack panel from canonical source
-        run: |
-          git -C "$RUNNER_TEMP/afterglow" fetch --depth 1 origin 1582036167e7c49feea3e67607d2abe926d4ecea
-          for file in rack-devices.js rack-devices.css; do
-            git -C "$RUNNER_TEMP/afterglow" show "1582036167e7c49feea3e67607d2abe926d4ecea:web/dist/$file" > "clawstudio/$file"
-          done
       - name: Version rack assets for returning sessions
         run: |
           for page in clawstudio/index.html clawstudio/devices.html clawstudio/poly/index.html clawstudio/texture/index.html clawstudio/acid303/index.html; do
-            sed -i 's/rack-devices[.]js/rack-devices.js?v=poly-rack-1/g; s/rack-devices[.]css/rack-devices.css?v=poly-rack-1/g' "$page"
+            sed -i 's/rack-devices[.]js/rack-devices.js?v=poly-rack-2/g; s/rack-devices[.]css/rack-devices.css?v=poly-rack-2/g' "$page"
           done
       - name: Commit the self-contained static site
         run: |
