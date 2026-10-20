@@ -1,4 +1,4 @@
-import {clawPatchbay} from './poly-modular.js?v=rack-update-20261020';
+import {clawPatchbay} from './poly-modular.js?v=edge-patch-20261020-2';
 // SPDX-License-Identifier: AGPL-3.0-only
 // Original Buchla-inspired, not a port of vintage hardware firmware.
 export const BUCHLA_SOURCES=['MOD OSC','CYCLE','RANDOM','ENVELOPE','MOTION','S&H'];

@@ -2,8 +2,8 @@
 // Three playable instrument modules share the host AudioContext, transport and routing.
 import {newPolyArp,arpEventsAtStep} from './poly-arp.js';
 import {attachPolyArp} from './poly-arp-ui.js';
-import {clawPatchbay} from './poly-modular.js?v=rack-update-20261020';
-import {buchlaParamDefaults,BUCHLA_DEFAULT_ROUTES,attachBuchlaPanel,patchModulation} from './texture-patch.js?v=rack-update-20261020';
+import {clawPatchbay} from './poly-modular.js?v=edge-patch-20261020-2';
+import {buchlaParamDefaults,BUCHLA_DEFAULT_ROUTES,attachBuchlaPanel,patchModulation} from './texture-patch.js?v=edge-patch-20261020-2';
 const TAU=2*Math.PI, cap=(n,a=0,b=1)=>Math.max(a,Math.min(b,n)), hz=n=>440*Math.pow(2,(n-69)/12);
 const midiName=n=>['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][((n%12)+12)%12]+(Math.floor(n/12)-1);
 const ease=(v,min,max)=>min*Math.pow(max/min,cap(v));
