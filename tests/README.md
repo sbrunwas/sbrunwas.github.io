@@ -1,3 +1,6 @@
-Serve the repository root with `python3 -m http.server 8001`, then open `/tests/patchbay-audio.html` in a browser with Web Audio support. The page runs offline audio regressions and prints PASS or FAIL; it needs no audio device or external test dependencies.
+Serve the repository root with `python3 -m http.server 8001`, then open either test page in a browser with Web Audio support. Each page renders audio offline and prints PASS or FAIL; no audio device or external test dependencies are needed.
 
-Checks cover audible LFO modulation, changing cutoff on an already-playing voice while patched, unplugging back to the unmodulated base, shared free-running LFOs across voices, and an audible effect from each newly added patch input. Offline control-rate updates are initialized explicitly so wall-clock timer scheduling does not affect comparisons.
+- `/tests/patchbay-audio.html`: audible LFO modulation, changing cutoff on an already-playing voice while patched, unplugging back to the unmodulated base, shared free-running LFOs, and audible effects from the expanded inputs.
+- `/tests/coarse-and-rates.html`: logarithmic slow LFO ranges, preservation of legacy Texture rates, rendered ±12-semitone pitch changes on Mono/Poly/Texture/Acid, live tuning of sustained notes, and independent oscillator tuning without losing fine-detune offsets.
+
+Offline control-rate values are initialized explicitly so wall-clock timer scheduling does not affect comparisons.

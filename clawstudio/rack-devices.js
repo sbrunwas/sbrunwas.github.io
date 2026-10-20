@@ -1,15 +1,16 @@
+import {coarseCents,attachCoarsePitch} from './coarse-pitch.js?v=slow-coarse-20261020';
 // ClawStudio original browser rack prototypes — not vendor ROM emulations.
 // Three playable instrument modules share the host AudioContext, transport and routing.
 import {newPolyArp,arpEventsAtStep} from './poly-arp.js';
 import {attachPolyArp} from './poly-arp-ui.js';
-import {clawPatchbay} from './poly-modular.js?v=additive-cv-20261020';
-import {buchlaParamDefaults,BUCHLA_DEFAULT_ROUTES,attachBuchlaPanel,patchModulation} from './texture-patch.js?v=additive-cv-20261020';
+import {clawPatchbay} from './poly-modular.js?v=slow-coarse-20261020';
+import {textureCycleRate,buchlaParamDefaults,BUCHLA_DEFAULT_ROUTES,attachBuchlaPanel,patchModulation} from './texture-patch.js?v=slow-coarse-20261020';
 const TAU=2*Math.PI, cap=(n,a=0,b=1)=>Math.max(a,Math.min(b,n)), hz=n=>440*Math.pow(2,(n-69)/12);
 const midiName=n=>['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][((n%12)+12)%12]+(Math.floor(n/12)-1);
 const ease=(v,min,max)=>min*Math.pow(max/min,cap(v));
-const basePoly={wave:'SUPER SAW',osc2:'SAW',detune:.4,mix:.78,shape:.3,tune:.5,sync:0,cutoff:.68,res:.28,env:.42,attack:.04,decay:.37,sustain:.65,release:.37,chorus:.65,delay:.22,drive:.12,motion:.12,modRate:.24,level:.57,arp:'UP',steps:8};
-const baseTexture={engine:'WAVETABLE',table:'GLASS',wave:.32,spread:.45,second:.48,third:.24,fm:.07,ring:.04,cutoff:.58,res:.22,filter2:.29,attack:.46,decay:.65,sustain:.82,release:.77,rate:.22,depth:.61,motion:.7,evolve:.45,space:.78,feedback:.21,level:.58,mutation:.22,filterMode:'SERIAL',filterA:'LOWPASS',filterB:'HIGHPASS',filterEnv:.22,envAttack:.26,envDecay:.7,character:.45,pace:'DRONE',arp:'DRIFT',steps:16,...buchlaParamDefaults};
-const baseAcid={wave:'SAW',cutoff:.43,res:.62,env:.64,decay:.36,accent:.58,slide:.37,drive:.28,tone:.4,volume:.65,steps:16,arp:'LINE'};
+const basePoly={coarse1:0,coarse2:0,wave:'SUPER SAW',osc2:'SAW',detune:.4,mix:.78,shape:.3,tune:.5,sync:0,cutoff:.68,res:.28,env:.42,attack:.04,decay:.37,sustain:.65,release:.37,chorus:.65,delay:.22,drive:.12,motion:.12,modRate:.24,level:.57,arp:'UP',steps:8};
+const baseTexture={coarse1:0,coarse2:0,coarse3:0,engine:'WAVETABLE',table:'GLASS',wave:.32,spread:.45,second:.48,third:.24,fm:.07,ring:.04,cutoff:.58,res:.22,filter2:.29,attack:.46,decay:.65,sustain:.82,release:.77,rate:.22,depth:.61,motion:.7,evolve:.45,space:.78,feedback:.21,level:.58,mutation:.22,filterMode:'SERIAL',filterA:'LOWPASS',filterB:'HIGHPASS',filterEnv:.22,envAttack:.26,envDecay:.7,character:.45,pace:'DRONE',arp:'DRIFT',steps:16,...buchlaParamDefaults};
+const baseAcid={coarse1:0,wave:'SAW',cutoff:.43,res:.62,env:.64,decay:.36,accent:.58,slide:.37,drive:.28,tone:.4,volume:.65,steps:16,arp:'LINE'};
 export const INSTRUMENT_PRESETS={
  poly:[
  ['CLASSIC / Anthem 1998',{detune:.67,mix:.84,cutoff:.73,chorus:.73,delay:.32,attack:.025,sustain:.76}],
@@ -136,11 +137,11 @@ class PolyEngine{
   v.out.gain.setTargetAtTime(p.level*.5,now,.025);v.filterEnvGain.gain.setTargetAtTime(p.env*1800,now,.025);
   const mix=superSawMix(p.mix),detune=superSawDetune(p.detune);
   v.osc.forEach((o,i)=>{const nominal=v.hz*Math.pow(2,(p.tune-.5)*.2);o.frequency.setTargetAtTime(v.kind==='SUPER SAW'?nominal*(1+SUPER_SAW_OFFSETS[i]*detune):nominal,now,.025);
-   o.detune.setTargetAtTime(v.kind==='SUPER SAW'?0:i===0?0:((i%2?-1:1)*Math.ceil(i/2)*3.7*p.detune*3.4),now,.025);
+   o.detune.setTargetAtTime(coarseCents(p.coarse1)+(v.kind==='SUPER SAW'?0:i===0?0:((i%2?-1:1)*Math.ceil(i/2)*3.7*p.detune*3.4)),now,.025);
    v.layers[i].gain.setTargetAtTime(v.kind==='SUPER SAW'?(i===3?mix.center:mix.side)*1.04:i===0?1:(p.mix/(v.osc.length-1))*1.25,now,.025);
    if(v.kind==='SHAPE'||v.kind==='FORMANT')o.setPeriodicWave(wave(this.ctx,v.kind==='SHAPE'?'ORGANIC':'VOCAL',p.shape));
   });
-  v.second.frequency.setTargetAtTime(v.hz*2**((p.shape-.5)*.3),now,.025);
+  v.second.frequency.setTargetAtTime(v.hz*2**((p.shape-.5)*.3),now,.025);v.second.detune.setTargetAtTime(coarseCents(p.coarse2),now,.025);
  }
  }
  setPatch(routes,rates){
@@ -171,6 +172,7 @@ for(let i=0;i<layers;i++){
    o.frequency.setValueAtTime(nominal,t);o.detune.value=det;
    g.gain.value=i===0?1:((p.mix||.5)/(layers-1))*1.25;
  }
+ o.detune.value+=coarseCents(p.coarse1);
  if(p.wave==='FORMANT'){const pw=wave(ctx,'VOCAL',p.shape);o.setPeriodicWave(pw)}
  if(p.wave==='SHAPE'){const pw=wave(ctx,'ORGANIC',p.shape);o.setPeriodicWave(pw)}
  if(p.wave==='FM'){const mod=ctx.createOscillator(),mg=ctx.createGain();mod.frequency.value=f*2;mg.gain.value=f*p.shape*2;mod.connect(mg);mg.connect(o.frequency);mod.start(t);mod.stop(end+.02)}
@@ -180,6 +182,7 @@ for(let i=0;i<layers;i++){
  const phaseHeadroom=1/Math.max(1,o.frequency.value);
  o.start(Math.max(ctx.currentTime,t-Math.random()*phaseHeadroom));o.stop(end+.04);oscs.push(o);layerGains.push(g)}
  const second=oscillator(ctx,p.osc2==='PULSE'?'square':p.osc2==='TRI'?'triangle':'sawtooth',f*2**((p.shape-.5)*.3),t,end+.04,.22,src);
+ second.detune.value=coarseCents(p.coarse2);
  const previous=this.voices.slice().reverse().find(v=>v.end>t&&v.osc?.length);
  const cv=clawPatchbay.makeAudio(ctx,'poly',{
     'LP FREQ':cut.detune,'PITCH':oscs.map(o=>o.detune).concat([second.detune]),
@@ -211,7 +214,7 @@ function textureRoute(ctx,pre,a,b,sum,mode){
 }
 class TextureEngine{
  constructor(ctx,dest,params){this.ctx=ctx;this.p=params;this.patchRoutes=[];this.fx=makeFX(ctx,dest,.42);this.voices=[];this.phaseOrigin=ctx.currentTime;this.modulators=clawPatchbay.makeAudio(ctx,'texture',{}, {rates:this.cvRates()},{sharedClock:true});this._tick=setInterval(()=>this.motion(),25);this.update()}
- cvRates(){const rate=.08*Math.pow(170,cap(this.p.buchlaRate??.4));return {a:rate,b:rate*.27,hold:rate*.72}}
+ cvRates(){const rate=textureCycleRate(this.p);return {a:rate,b:rate*.27,hold:rate*.72}}
  syncPatch(){const routes=this.patchRoutes.map(r=>({source:r.source,dest:r.target,depth:r.amount}));for(const v of this.voices)v.cv?.setRoutes(routes)}
  update(){const p=this.p,t=this.ctx.currentTime;this.fx.wet.gain.setTargetAtTime(p.space*.62,t,.08);this.fx.delayWet.gain.setTargetAtTime(p.feedback*.38,t,.06);this.fx.feed.gain.setTargetAtTime(Math.min(.72,.16+p.feedback*.4),t,.06);this.modulators.setRates(this.cvRates());this.syncPatch();this.motion()}
  motion(){const ctx=this.ctx,p=this.p,t=ctx.currentTime;
@@ -219,6 +222,7 @@ class TextureEngine{
    const phase=t*(.018+p.rate*.45)+(v.seed||0),drift=Math.sin(phase*TAU)*p.motion*p.depth,slow=Math.sin((phase*.317+.22)*TAU);
    const age=Math.max(0,t-v.start),env=(1-Math.exp(-age/(.02+p.envAttack*2)))*Math.exp(-age/(.05+p.envDecay*4));
    const modulation=patchModulation(this.patchRoutes,p,v,t);
+   for(const tuning of v.tuning){tuning.osc.detune.setTargetAtTime(tuning.base+coarseCents(p['coarse'+tuning.group]),t,.02)}
    const mod=drift+slow*p.evolve*.33;
    const cutoff=ease(cap(p.cutoff+mod*.32+p.filterEnv*env*.2),45,16200);
    const cutoff2=ease(cap(p.filter2+mod*.2),35,14900);
@@ -226,7 +230,7 @@ class TextureEngine{
    v.f1.Q.setTargetAtTime(.65+p.res*10,t,.06);v.f2.Q.setTargetAtTime(.6+p.ring*11,t,.06);
    if(v.carriers){for(let i=0;i<v.carriers.length;i++){const o=v.carriers[i];if(v.kind!=='WAVETABLE')continue;const pos=cap(p.wave+Math.sin(phase*TAU+i*1.7)*p.depth*.49+modulation.TIMBRE*(.25+.75*(p.buchlaIndex??.3)));const bucket=p.table+':'+Math.round(pos*64);if(v.buckets[i]!==bucket){o.setPeriodicWave(wave(ctx,p.table,pos));v.buckets[i]=bucket}}}
    if(v.modDepth)v.modDepth.gain.setTargetAtTime(v.hz*(.04+p.fm*(.6+p.character*3))*(.6+(.5+drift)*p.evolve),t,.09);
-   if(v.bands){for(let i=0;i<v.bands.length;i++)v.bands[i].frequency.setTargetAtTime(Math.min(11500,v.bandBase[i]*(1+mod*.4)),t,.08)}
+   if(v.bands){for(let i=0;i<v.bands.length;i++)v.bands[i].frequency.setTargetAtTime(Math.min(11500,v.bandBase[i]*(v.kind==='RESONATOR'?2**((coarseCents(p.coarse1)/100)/12):1)*(1+mod*.4)),t,.08)}
    const foldAmount=cap((p.buchlaFold??0)+modulation.FOLD*(.25+.75*(p.buchlaIndex??.3))),bucket=Math.round(foldAmount*22);
    if(v.foldBucket!==bucket){v.fold.curve=wavefoldCurve(bucket/22);v.foldBucket=bucket}
    const depth=cap(p.buchlaLpg??0),decay=.08+(p.buchlaDecay??.5)*2.8;
@@ -253,17 +257,18 @@ class TextureEngine{
   const pace=p.pace==='PLUCK'?.18:p.pace==='PULSE'?.53:p.pace==='SWARM'?1.4:2.7;
   const length=Math.max(.1,dur,pace*(.45+p.evolve*1.3));
   const end=stage(amp.gain,t,kind==='RESONATOR'?Math.min(.025,p.attack):(p.pace==='PLUCK'?Math.min(.08,p.attack):p.attack),p.decay,p.pace==='PLUCK'?Math.min(.16,p.sustain):p.sustain,p.release,length,.22);
-  const voice={kind,start:t,end,seed:Math.random(),phaseOrigin:this.phaseOrigin,hz:f,level,pitched:[],carriers:[],buckets:[],f1,f2,pan,amp,fold,lpgFilter,lpgGain,foldBucket:null,modDepth:null,bands:null,bandBase:null};
-  const osc=(shape,frequency,destination,gain=.5)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type=shape;o.frequency.setValueAtTime(Math.min(16000,frequency),t);g.gain.value=gain;o.connect(g);g.connect(destination);o.start(t);o.stop(end+.06);voice.pitched.push(o);return o};
+  const voice={kind,start:t,end,seed:Math.random(),phaseOrigin:this.phaseOrigin,hz:f,level,pitched:[],tuning:[],carriers:[],buckets:[],f1,f2,pan,amp,fold,lpgFilter,lpgGain,foldBucket:null,modDepth:null,bands:null,bandBase:null};
+  const tune=(osc,group=1,base=0)=>{osc.detune.value=base+coarseCents(p['coarse'+group]);voice.tuning.push({osc,group,base});return osc};
+  const osc=(shape,frequency,destination,gain=.5,group=1)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type=shape;o.frequency.setValueAtTime(Math.min(16000,frequency),t);g.gain.value=gain;o.connect(g);g.connect(destination);o.start(t);o.stop(end+.06);voice.pitched.push(o);return tune(o,group)};
   const bufNoise=(gain)=>{const src=ctx.createBufferSource(),g=ctx.createGain();src.buffer=textureNoise(ctx);src.loop=true;g.gain.value=gain;src.connect(g);g.connect(pre);src.start(t);src.stop(end+.06);return src};
   if(kind==='WAVETABLE'){
-   for(let i=0;i<3;i++){const o=osc('sine',f*(i===2?2:1),pre,[.7,p.second*.4,p.third*.33][i]);o.detune.value=(i===0?0:i===1?-1:1)*p.spread*18;o.setPeriodicWave(wave(ctx,p.table,cap(p.wave+i*.13)));voice.carriers.push(o);voice.buckets.push(null)}
+   for(let i=0;i<3;i++){const o=osc('sine',f*(i===2?2:1),pre,[.7,p.second*.4,p.third*.33][i],i+1);const spread=(i===0?0:i===1?-1:1)*p.spread*18;voice.tuning.at(-1).base=spread;o.detune.value=spread+coarseCents(p['coarse'+(i+1)]);o.setPeriodicWave(wave(ctx,p.table,cap(p.wave+i*.13)));voice.carriers.push(o);voice.buckets.push(null)}
   }else if(kind==='FM MATRIX'){
-   const carrier=osc('sine',f,pre,.72);const mod1=ctx.createOscillator(),g1=ctx.createGain();mod1.frequency.value=f*(1+Math.round(p.wave*11));g1.gain.value=f*p.fm*(.4+p.character*8);mod1.connect(g1);g1.connect(carrier.frequency);mod1.start(t);mod1.stop(end+.06);voice.modDepth=g1;voice.pitched.push(mod1);
-   if(p.third>.05){const mod2=ctx.createOscillator(),mg=ctx.createGain();mod2.frequency.value=f*(.51+p.ring*11);mg.gain.value=f*p.third*(1+p.second*4);mod2.connect(mg);mg.connect(mod1.frequency);mod2.start(t);mod2.stop(end+.06);voice.pitched.push(mod2)}
+   const carrier=osc('sine',f,pre,.72);const mod1=ctx.createOscillator(),g1=ctx.createGain();mod1.frequency.value=f*(1+Math.round(p.wave*11));g1.gain.value=f*p.fm*(.4+p.character*8);mod1.connect(g1);g1.connect(carrier.frequency);mod1.start(t);mod1.stop(end+.06);voice.modDepth=g1;voice.pitched.push(mod1);tune(mod1,2);
+   if(p.third>.05){const mod2=ctx.createOscillator(),mg=ctx.createGain();mod2.frequency.value=f*(.51+p.ring*11);mg.gain.value=f*p.third*(1+p.second*4);mod2.connect(mg);mg.connect(mod1.frequency);mod2.start(t);mod2.stop(end+.06);voice.pitched.push(mod2);tune(mod2,3)}
   }else if(kind==='WAVEFOLD'){
    const fold=ctx.createWaveShaper();fold.curve=wavefoldCurve(Math.max(p.character,p.wave));
-   const oscBus=ctx.createGain();oscBus.connect(fold);fold.connect(pre);osc('sine',f,oscBus,.8);if(p.second>.04)osc('triangle',f*(1+Math.round(p.wave*3)),oscBus,p.second*.48);
+   const oscBus=ctx.createGain();oscBus.connect(fold);fold.connect(pre);osc('sine',f,oscBus,.8);if(p.second>.04)osc('triangle',f*(1+Math.round(p.wave*3)),oscBus,p.second*.48,2);
   }else if(kind==='RESONATOR'){
    const src=ctx.createBufferSource(),env=ctx.createGain(),mix=ctx.createGain();src.buffer=textureNoise(ctx);src.loop=true;
    env.gain.setValueAtTime(0,t);env.gain.linearRampToValueAtTime(.8,t+.004);env.gain.exponentialRampToValueAtTime(.0001,t+.025+p.character*.21);
@@ -279,23 +284,23 @@ class TextureEngine{
     tail.gain.setValueAtTime(.0001,t);
     tail.gain.linearRampToValueAtTime(gain,t+.007);
     tail.gain.exponentialRampToValueAtTime(.0001,Math.min(end-.08,t+.13+p.evolve*2.8/(1+i*.42)));
-    partial.connect(tail);tail.connect(pre);partial.start(t);partial.stop(end+.05);voice.pitched.push(partial);
+    partial.connect(tail);tail.connect(pre);partial.start(t);partial.stop(end+.05);voice.pitched.push(partial);tune(partial,1);
    }
   }else if(kind==='NOISE'){
    bufNoise(.75);if(p.fm>.06)osc('triangle',f,pre,.2+p.fm*.35);
   }else if(kind==='FORMANT'){
-   const source=ctx.createGain();osc('sawtooth',f,source,.52);osc('triangle',f*2,source,.18);
+   const source=ctx.createGain();osc('sawtooth',f,source,.52);osc('triangle',f*2,source,.18,2);
    const base=[450,1300,2600];voice.bands=[];voice.bandBase=[];
    for(let i=0;i<3;i++){const band=ctx.createBiquadFilter(),g=ctx.createGain();band.type='bandpass';band.frequency.value=base[i]*(.7+p.wave*.75+p.character*.12);band.Q.value=2+p.ring*14;g.gain.value=[.82,.65,.36][i];source.connect(band);band.connect(g);g.connect(pre);voice.bands.push(band);voice.bandBase.push(band.frequency.value)}
   }else if(kind==='RING'){
    const carrier=ctx.createOscillator(),mod=ctx.createOscillator(),mult=ctx.createGain(),level=ctx.createGain();
    carrier.type='sine';carrier.frequency.value=f;mod.type='sine';mod.frequency.value=f*(.5+Math.round(p.wave*8)+p.character*.33);
    mult.gain.value=0;level.gain.value=.64;mod.connect(mult.gain);carrier.connect(mult);mult.connect(level);level.connect(pre);
-   mod.start(t);carrier.start(t);carrier.stop(end+.06);mod.stop(end+.06);voice.pitched.push(carrier,mod);
-   if(p.second>.02)osc('triangle',f*.5,pre,p.second*.18);
+   mod.start(t);carrier.start(t);carrier.stop(end+.06);mod.stop(end+.06);voice.pitched.push(carrier,mod);tune(carrier,1);tune(mod,2);
+   if(p.second>.02)osc('triangle',f*.5,pre,p.second*.18,3);
   }
   // Every pitched engine has an additive FM input, even outside FM MATRIX mode.
-  if(!voice.modDepth&&voice.pitched.length){const mod=ctx.createOscillator(),depth=ctx.createGain();mod.frequency.value=f*2;depth.gain.value=0;mod.connect(depth);for(const o of voice.pitched)depth.connect(o.frequency);mod.start(t);mod.stop(end+.08);voice.patchFM=depth}
+  if(!voice.modDepth&&voice.pitched.length){const mod=ctx.createOscillator(),depth=ctx.createGain();mod.frequency.value=f*2;depth.gain.value=0;mod.connect(depth);for(const o of voice.pitched)depth.connect(o.frequency);mod.start(t);mod.stop(end+.08);voice.patchFM=depth;tune(mod,2)}
   voice.cv=clawPatchbay.makeAudio(ctx,'texture',{
    'FILTER':{param:f1.detune,scale:2400},'FILTER 2':{param:f2.detune,scale:2400},
    'RESONANCE':{param:f1.Q,scale:8},'RES 2':{param:f2.Q,scale:8},
@@ -313,7 +318,7 @@ class TextureEngine{
 }
 class AcidEngine{
  constructor(ctx,dest,p){this.ctx=ctx;this.p=p;this.stage=ctx.createGain();this.stage.gain.value=.0001;this.filter1=ctx.createBiquadFilter();this.filter1.type='lowpass';this.filter2=ctx.createBiquadFilter();this.filter2.type='lowpass';this.drive=ctx.createWaveShaper();this.output=ctx.createGain();this.osc=ctx.createOscillator();this.osc.type='sawtooth';this.osc.frequency.value=55;this.osc.connect(this.filter1);this.filter1.connect(this.filter2);this.filter2.connect(this.drive);this.drive.connect(this.stage);this.stage.connect(this.output);this.output.connect(dest);this.osc.start();this.lastNote=null;this.end=0;this.update()}
- update(){let t=this.ctx.currentTime,p=this.p;this.osc.type=p.wave==='SQUARE'?'square':'sawtooth';this.filter1.Q.setTargetAtTime(.75+p.res*19,t,.02);this.filter2.Q.setTargetAtTime(.4+p.res*6,t,.02);this.output.gain.setTargetAtTime(p.volume*.33,t,.05);const a=new Float32Array(1024);for(let i=0;i<a.length;i++){let x=i/511.5-1;a[i]=Math.tanh(x*(1+p.drive*13))}this.drive.curve=a}
+ update(){let t=this.ctx.currentTime,p=this.p;this.osc.detune.setTargetAtTime(coarseCents(p.coarse1),t,.02);this.osc.type=p.wave==='SQUARE'?'square':'sawtooth';this.filter1.Q.setTargetAtTime(.75+p.res*19,t,.02);this.filter2.Q.setTargetAtTime(.4+p.res*6,t,.02);this.output.gain.setTargetAtTime(p.volume*.33,t,.05);const a=new Float32Array(1024);for(let i=0;i<a.length;i++){let x=i/511.5-1;a[i]=Math.tanh(x*(1+p.drive*13))}this.drive.curve=a}
  note(midi,t,dur,accent=false,slide=false,holdNext=false){const p=this.p,ctx=this.ctx,f=hz(midi),last=this.lastNote||f;this.osc.frequency.cancelScheduledValues(t);this.osc.frequency.setValueAtTime(last,t);if(slide)this.osc.frequency.setTargetAtTime(f,t+.004,.008+p.slide*.22);else this.osc.frequency.setValueAtTime(f,t);
 const base=ease(p.cutoff,90,1600),peak=Math.min(13000,base*(1+p.env*9+(accent?p.accent*7:0))),decay=.065+p.decay*.72;for(let filt of [this.filter1,this.filter2]){filt.frequency.cancelScheduledValues(t);filt.frequency.setValueAtTime(peak,t);filt.frequency.setTargetAtTime(base,t+.008,decay/(accent?3.6:4))}
 const g=this.stage.gain;g.cancelScheduledValues(t);if(!slide||this.end<t){g.setValueAtTime(.0001,t);g.linearRampToValueAtTime(accent?1.1:.72,t+.008)}else g.setTargetAtTime(accent?1.1:.72,t,.01);
@@ -359,6 +364,18 @@ export function createRackInstrument(mount,type,{externalClock=false,tempo=()=>1
  const knobs=cfg.keys.map(k=>makeKnob(k,p[k],cfg.color)).join('');
 
  mount.innerHTML=`<div class="cri cri-${type}" style="--accent:${cfg.color}"><div class="cri-rack-ear">●<span>●</span></div><header class="cri-head"><div><span class="cri-kicker">CLAWSTUDIO · SYNTHESIS LAB / ${type.toUpperCase()}</span><h2>${title}</h2><p>${cfg.subtitle}</p></div><div class="cri-display"><div>${cfg.name} <em>REV 01</em></div><strong id="cri-patchname">${presets[0][0]}</strong><small>INDEPENDENT CLOCK · MIXER OUTPUT</small></div></header><div class="cri-toolbar"><label>PATCH <select id="cri-presets">${pSelect}</select></label><button id="cri-prev">◀</button><button id="cri-next">▶</button><button id="cri-rand">${type==='texture'?'MUTATE':'VARIATION'} ↝</button><button id="cri-undo">UNDO</button>${type==='texture'?'<label class="cri-lock">MUTATION <select id="cri-mutate-scope"><option value="TWEAK">TWEAK</option><option value="TIMBRE">TIMBRE</option><option value="WILD">WILD</option></select></label><label class="cri-lock"><input id="cri-lock-engine" type="checkbox"> LOCK ENGINE</label><label class="cri-lock"><input id="cri-lock-filter" type="checkbox"> LOCK FILTER</label><label class="cri-lock"><input id="cri-lock-env" type="checkbox"> LOCK ENVS</label>':''}<button id="cri-jam">▶ AUDITION</button>${type==='texture'?'<button id="cri-hit" title="Hear this patch instantly">♪ HEAR PATCH</button>':''}</div><div class="cri-controls">${type==='poly'?makePolyPanel(cfg,p):`<div class="cri-feature"><div class="cri-striplabel">${type==='texture'?'WAVETABLE / MODULATION PATH':'ANALOG VOICE / ACID CONTOUR'}</div><div class="cri-selectors">${selectors}</div>${type==='texture'?'<div class="cri-waveform"><canvas class="cri-wave" width="680" height="115"></canvas><span>SPECTRAL EVOLUTION / WAVETABLE POSITION</span></div>':''}<div class="cri-knobs">${knobs}</div></div>`}</div><div class="cri-sequencer"><div class="cri-seqbar"><strong>${type==='acid'?'303 / STEP PROGRAMMING':'PATTERN / PERFORMANCE MEMORY'}</strong><div><label>PATTERN <select id="cri-pattern">${Array.from({length:8},(_,i)=>`<option value="${i}">${String(i+1).padStart(2,'0')}</option>`).join('')}</select></label><label>STEPS <select id="cri-length">${[4,8,16,32,64].map(n=>`<option value="${n}">${n}</option>`).join('')}</select></label><label>ROOT <select id="cri-root">${Array.from({length:73},(_,i)=>`<option value="${12+i}">${midiName(i+12)}</option>`).join('')}</select></label><button id="cri-stepsrnd">RND NOTES</button></div></div><div class="cri-stepgrid" id="cri-steps"></div><div class="cri-stepedit"><strong>STEP <span id="cri-selected">01</span></strong><label>NOTE <select id="cri-note">${Array.from({length:61},(_,i)=>`<option value="${i-24}">${midiName(Math.max(0,state.root+i-24))}</option>`).join('')}</select></label><button id="cri-step-on">GATE</button><button id="cri-accent">ACCENT</button><button id="cri-slide">${type==='acid'?'SLIDE':'TIE / LEGATO'}</button><label>GATE LENGTH <input id="cri-gate" type="range" min=".1" max="1" step=".01"></label><button id="cri-save">SAVE</button><button id="cri-load">LOAD</button><input type="file" id="cri-loadfile" accept=".json" hidden></div></div><div class="cri-footer"><span id="cri-status">Try the factory patches, then design your own sound.</span><span>${type==='poly'?'JP BLUE / 7 SAWS · EUROPA-INSPIRED MODIFIERS':type==='texture'?'EVOLVE · MUTATE · KEEP THE HAPPY ACCIDENTS':'CLASSIC ACID · PATTERNS · SLIDE · ACCENT'}</span></div><div class="cri-rack-ear bottom">●<span>●</span></div></div>`;
+ const coarsePanels=[];
+ const coarseChanged=()=>{engine?.update?.();currentPreset='USER EDIT';$('#cri-patchname').textContent=currentPreset;syncUI()};
+ if(type==='poly'){
+  coarsePanels.push(attachCoarsePitch($('.jp-osc1'),p,[{key:'coarse1',label:'OSC 1'}],coarseChanged));
+  coarsePanels.push(attachCoarsePitch($('.jp-osc2'),p,[{key:'coarse2',label:'OSC 2'}],coarseChanged));
+ }else{
+  const controls=type==='acid'?[{key:'coarse1',label:'OSCILLATOR'}]:[
+   {key:'coarse1',label:q=>q.engine==='NOISE'?'TONAL OSC':'OSC 1 / CARRIER'},
+   {key:'coarse2',label:q=>q.engine==='FM MATRIX'||q.engine==='RING'?'OSC 2 / MOD 1':'OSC 2',enabled:q=>q.engine!=='NOISE'&&q.engine!=='RESONATOR'},
+   {key:'coarse3',label:q=>q.engine==='FM MATRIX'?'OSC 3 / MOD 2':q.engine==='RING'?'SUB OSC':'OSC 3',enabled:q=>['WAVETABLE','FM MATRIX','RING'].includes(q.engine)}];
+  coarsePanels.push(attachCoarsePitch($('.cri-feature'),p,controls,coarseChanged));
+ }
  const polyArpPanel=type==='poly'?attachPolyArp(mount,state):null;
  function polyModState(){
    if(!state.polyMod||typeof state.polyMod!=='object')state.polyMod={routes:[],rates:clawPatchbay.ratesSafe()};
@@ -379,7 +396,7 @@ export function createRackInstrument(mount,type,{externalClock=false,tempo=()=>1
  }):null;
  const persistentPatch=state.patchRoutes;
  const buchlaPanel=type==='texture'?attachBuchlaPanel(mount,persistentPatch,p,()=>{engine?.syncPatch();engine?.update()}):null;
- let page=0;const val=k=>p[k],syncUI=()=>{$$('[data-knob]').forEach(el=>{let v=cap(p[el.dataset.knob]);el.style.setProperty('--rot',(-135+v*270)+'deg');el.style.setProperty('--v',v);el.setAttribute('aria-valuenow',Math.round(v*100));mount.querySelector(`[data-val="${el.dataset.knob}"]`).textContent=Math.round(v*100)});$$('[data-opt]').forEach(el=>el.value=p[el.dataset.opt]);$$('[data-fader]').forEach(el=>{el.value=p[el.dataset.fader];const output=mount.querySelector(`[data-val="${el.dataset.fader}"]`);if(output)output.textContent=Math.round(p[el.dataset.fader]*100)});$('#cri-length').value=state.steps;$('#cri-pattern').value=state.pattern;$('#cri-root').value=state.root;showSteps();drawWave();polyArpPanel?.refresh();buchlaPanel?.refresh()};
+ let page=0;const val=k=>p[k],syncUI=()=>{$$('[data-knob]').forEach(el=>{let v=cap(p[el.dataset.knob]);el.style.setProperty('--rot',(-135+v*270)+'deg');el.style.setProperty('--v',v);el.setAttribute('aria-valuenow',Math.round(v*100));mount.querySelector(`[data-val="${el.dataset.knob}"]`).textContent=Math.round(v*100)});$$('[data-opt]').forEach(el=>el.value=p[el.dataset.opt]);$$('[data-fader]').forEach(el=>{el.value=p[el.dataset.fader];const output=mount.querySelector(`[data-val="${el.dataset.fader}"]`);if(output)output.textContent=Math.round(p[el.dataset.fader]*100)});$('#cri-length').value=state.steps;$('#cri-pattern').value=state.pattern;$('#cri-root').value=state.root;showSteps();drawWave();polyArpPanel?.refresh();buchlaPanel?.refresh();coarsePanels.forEach(panel=>panel.refresh())};
  function drawWave(){const cv=$('.cri-wave');if(!cv||!cv.getContext)return;let c=cv.getContext('2d');if(!c)return;c.clearRect(0,0,680,115);c.strokeStyle=type==='texture'?'#153b56':'#fff';c.lineWidth=2;c.beginPath();for(let i=0;i<680;i++){let x=i/680*TAU*5;let kind=p.engine||'WAVETABLE';let y=kind==='NOISE'?Math.sin(x*7.7)*Math.sin(x*33.1)*.8:kind==='RESONATOR'?Math.sin(x)*Math.exp(-((i/680)*5)%1*3):kind==='RING'?Math.sin(x)*Math.sin(x*(2+p.character*12)):kind==='WAVEFOLD'?Math.sin(Math.sin(x)*(2+p.character*16)):kind==='FM MATRIX'?Math.sin(x+Math.sin(x*(1+p.wave*8))*p.fm*5):kind==='FORMANT'?Math.sin(x)*Math.sin(x*.4)*.6:Math.sin(x)*(1-p.wave)+Math.sin(3*x+p.wave*6)*p.wave*.45+Math.sin(7*x+p.fm*8)*p.ring*.7;let yy=56-y*29;if(i===0)c.moveTo(i,yy);else c.lineTo(i,yy)}c.stroke()}
  function showSteps(){for(const opt of $('#cri-note').options){opt.textContent=midiName(Math.max(0,Math.min(127,state.root+Number(opt.value))))}const host=$('#cri-steps');host.innerHTML='';let length=state.steps;host.style.setProperty('--cols',Math.min(16,length));for(let i=0;i<length;i++){let idx=i,s=state.patterns[state.pattern][idx],b=document.createElement('button');b.className='cri-step'+(s.on?' on':'')+(idx===selected?' editing':'')+(idx===lastSeq?' playhead':'');b.innerHTML=`<span>${String(idx+1).padStart(2,'0')}</span><strong>${midiName(state.root+s.note)}</strong><small>${s.accent?'▲':''}${s.slide?'↗':''}</small>`;b.onclick=()=>{if(selected===idx)s.on=!s.on;selected=idx;showSteps();editUI()};host.append(b)}editUI()}
  function editUI(){let s=state.patterns[state.pattern][selected];$('#cri-selected').textContent=String(selected+1).padStart(2,'0');$('#cri-note').value=s.note;$('#cri-gate').value=s.gate;for(let [id,k] of [['cri-step-on','on'],['cri-accent','accent'],['cri-slide','slide']])$('#'+id).classList.toggle('lit',s[k])}
@@ -418,7 +435,7 @@ export function createRackInstrument(mount,type,{externalClock=false,tempo=()=>1
  $('#cri-stepsrnd').onclick=()=>{for(let i=0;i<state.steps;i++){let s=state.patterns[state.pattern][i];s.note=templates[type][Math.random()*16|0];s.on=Math.random()>(type==='texture'?.72:.38);s.accent=Math.random()<.22;s.slide=Math.random()<.15}showSteps()};
  $('#cri-note').onchange=e=>{state.patterns[state.pattern][selected].note=+e.target.value;showSteps()};$('#cri-gate').oninput=e=>{state.patterns[state.pattern][selected].gate=+e.target.value};for(let [id,k] of [['cri-step-on','on'],['cri-accent','accent'],['cri-slide','slide']])$('#'+id).onclick=()=>{let s=state.patterns[state.pattern][selected];s[k]=!s[k];showSteps()};
  $('#cri-save').onclick=()=>{const blob=new Blob([JSON.stringify({format:'clawstudio-rack-device',version:1,type,state},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`ClawStudio-${type}-patch.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500)};
- $('#cri-load').onclick=()=>$('#cri-loadfile').click();$('#cri-loadfile').onchange=async e=>{try{const obj=JSON.parse(await e.target.files[0].text());if(obj.format!=='clawstudio-rack-device'||obj.type!==type||!obj.state||!Array.isArray(obj.state.patterns)||obj.state.patterns.length!==8)throw Error('Incorrect preset format');Object.assign(state,{...obj.state,p:{...cfg.preset,...obj.state.p}});if(type==='texture'){persistentPatch.splice(0,persistentPatch.length,...(Array.isArray(obj.state.patchRoutes)?obj.state.patchRoutes:BUCHLA_DEFAULT_ROUTES()));state.patchRoutes=persistentPatch;buchlaPanel?.refresh()}if(type==='poly'){state.polyArp={...newPolyArp(),...(obj.state.polyArp||{})};polyModState();syncPolyMod();polyModPanel?.refresh()}Object.assign(p,state.p);if(![4,8,16,32,64].includes(state.steps))state.steps=16;page=0;selected=0;engine?.update?.();syncUI();$('#cri-status').textContent='Patch loaded'}catch(ex){$('#cri-status').textContent='Cannot load: '+ex.message}};
+ $('#cri-load').onclick=()=>$('#cri-loadfile').click();$('#cri-loadfile').onchange=async e=>{try{const obj=JSON.parse(await e.target.files[0].text());if(obj.format!=='clawstudio-rack-device'||obj.type!==type||!obj.state||!Array.isArray(obj.state.patterns)||obj.state.patterns.length!==8)throw Error('Incorrect preset format');const loadedParams={...cfg.preset,...obj.state.p};Object.assign(state,{...obj.state,p});Object.assign(p,loadedParams);if(type==='texture'){persistentPatch.splice(0,persistentPatch.length,...(Array.isArray(obj.state.patchRoutes)?obj.state.patchRoutes:BUCHLA_DEFAULT_ROUTES()));state.patchRoutes=persistentPatch;buchlaPanel?.refresh()}if(type==='poly'){state.polyArp={...newPolyArp(),...(obj.state.polyArp||{})};polyModState();syncPolyMod();polyModPanel?.refresh()}Object.assign(p,state.p);if(![4,8,16,32,64].includes(state.steps))state.steps=16;page=0;selected=0;engine?.update?.();syncUI();$('#cri-status').textContent='Patch loaded'}catch(ex){$('#cri-status').textContent='Cannot load: '+ex.message}};
  function init(context,destination){if(engine)return engine;ctx=context;engine=type==='poly'?new PolyEngine(ctx,destination,p):type==='texture'?new TextureEngine(ctx,destination,p):new AcidEngine(ctx,destination,p);if(type==='texture')engine.patchRoutes=persistentPatch;if(type==='poly')syncPolyMod();return engine}
  function scheduleStep(step,t,dur){if(!state.active||!engine)return;let i=step%state.steps,s=state.patterns[state.pattern][i];if(type==='poly'&&state.polyArp?.enabled){for(const event of arpEventsAtStep(state.polyArp,state.root,step,dur))engine.note(event.note,t+event.offset,event.length,event.velocity)}else if(s.on){let note=Math.min(127,Math.max(0,state.root+s.note));const length=Math.max(.06,dur*s.gate);if(type==='poly'){if(p.arp==='CHORD'){for(let n of [0,4,7])engine.note(note+n,t,length)}else if(p.arp==='OFF'){if(i%4===0)engine.note(note,t,length)}else engine.note(note+(p.arp==='DOWN'?(3-i%4)*3:(i%4)*3),t,length)}else if(type==='texture'){const hold=p.pace==='PLUCK'?1.3:p.pace==='PULSE'?2:p.pace==='SWARM'?3.5:6;const gate=length*hold;if(p.arp==='CHORD'){for(let n of [0,4,7])engine.note(note+n,t,gate)}else if(p.arp==='DRIFT'){for(let n of [0,7,12])engine.note(note+n,t,gate)}else if(p.arp==='UP'){engine.note(note+(i%3)*5,t,gate)}else engine.note(note,t,gate)}else {
   const pattern=state.patterns[state.pattern],fromPrevious=acidSlideFromPrevious(pattern,i,state.steps);

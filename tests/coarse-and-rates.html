@@ -1,0 +1,40 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Coarse tuning and slow LFO regression tests</title><pre id="results">Running…</pre><script type="module">
+import {createRackInstrument} from '../clawstudio/rack-devices.js';
+import {createBass01} from '../clawstudio/bass01.js';
+import {clawPatchbay} from '../clawstudio/poly-modular.js';
+import {textureCycleRate} from '../clawstudio/texture-patch.js';
+const assert=(ok,message)=>{if(!ok)throw Error(message)};const near=(a,b,tolerance=.00001)=>Math.abs(a-b)<tolerance;const lines=[];const results=document.querySelector('#results');
+const hzFromSamples=(audio,start,end)=>{let count=0;for(let i=Math.floor(start*48000)+1;i<end*48000;i++)if(audio[i-1]<=0&&audio[i]>0)count++;return count/(end-start)};
+async function pitch(type,semitones,live=false){
+ const mount=document.createElement('div');document.body.append(mount);const rack=type==='mono'?createBass01(mount):createRackInstrument(mount,type),p=rack.state.params||rack.state.p;
+ Object.assign(p,{coarse1:semitones,coarse2:0,attack:0,decay:.2,sustain:1,release:.1,cutoff:1,env:0,res:0,drive:0,motion:0,evolve:0,depth:0,chorus:0,delay:0,space:0,feedback:0,level:.7,volume:.7});
+ if(type==='mono')Object.assign(p,{mode:'FM',fmIndex:0,fmRatio:1,saw:1,pulse:0,sub:0,noise:0,hp:0,lp:1,hpres:0,lpres:0,filterEnv:0,duck:0,lfo1Depth:0,lfo2Depth:0});
+ if(type==='poly')Object.assign(p,{wave:'FM',shape:0,mix:0,tune:.5});
+ if(type==='texture'){Object.assign(p,{engine:'WAVETABLE',second:0,third:0,wave:0,pace:'DRONE',filterB:'LOWPASS',filter2:1,buchlaFold:0,buchlaLpg:0,filterEnv:0});rack.state.patchRoutes.splice(0)}
+ const ctx=new OfflineAudioContext(2,48000,48000),engine=rack.init(ctx,ctx.destination);
+ if(type==='mono')engine.noteOn(57,0,1);else engine.note(57,0,1);
+ if(type==='poly')engine.voices[0].second.levelNode.gain.value=0;
+ if(type==='texture'){clearInterval(engine._tick);engine.motion();engine.voices[0].carriers[0].type='sine'}
+ const oscillator=type==='mono'?engine.carrier:type==='acid'?engine.osc:type==='poly'?engine.voices[0].osc[0]:engine.voices[0].carriers[0];
+ if(live)ctx.suspend(.4).then(()=>{p.coarse1=12;engine.update(type==='mono'?p:undefined);ctx.resume()});
+ try{const buffer=await ctx.startRendering(),audio=buffer.getChannelData(0);assert(audio.every(Number.isFinite),type+' finite samples');return {first:hzFromSamples(audio,.15,.35),last:hzFromSamples(audio,.65,.85),detune:oscillator.detune.value}}finally{rack.dispose();mount.remove()}
+}
+async function independentGroups(type){
+ const mount=document.createElement('div');document.body.append(mount);const rack=type==='mono'?createBass01(mount):createRackInstrument(mount,type),p=rack.state.params||rack.state.p;
+ const ctx=new OfflineAudioContext(2,48000,48000),engine=rack.init(ctx,ctx.destination);if(type==='mono')engine.noteOn(57,0,1);else engine.note(57,0,1);
+ if(type==='texture'){clearInterval(engine._tick);engine.motion()}
+ const checks=type==='mono'?[[engine.carrier,'coarse1',12],[engine.pulse,'coarse2',-12],[engine.super1,'coarseStack',7],[engine.super2,'coarseStack',7],[engine.sub,'coarseSub',-24],[engine.fm,'coarseFM',24]]:type==='poly'?[[engine.voices[0].osc[0],'coarse1',12],[engine.voices[0].second,'coarse2',-12]]:type==='texture'?engine.voices[0].carriers.map((osc,i)=>[osc,'coarse'+(i+1),[12,-12,7][i]]):[[engine.osc,'coarse1',12]];
+ let before;
+ ctx.suspend(.2).then(()=>{before=checks.map(([osc])=>osc.detune.value);for(const [,key,value] of checks)p[key]=value;engine.update(type==='mono'?p:undefined);ctx.resume()});
+ try{await ctx.startRendering();checks.forEach(([osc,key,value],i)=>assert(near(osc.detune.value-before[i],value*100,1),type+' independent '+key+' retains fine-detune offset'))}finally{rack.dispose();mount.remove()}
+}
+try{
+ const rates=clawPatchbay.ratesSafe({a:.001,b:.001,hold:.001});assert(rates.a===.001&&rates.b===.001&&rates.hold===.001,'slow Hz preserved');assert(near(clawPatchbay.rateFromSlider(0),.001),'slider reaches 1000-second cycle');assert(near(clawPatchbay.rateFromSlider(1),18),'fast range retained');assert(near(clawPatchbay.rateFromSlider(clawPatchbay.rateToSlider(.005)),.005),'logarithmic rate mapping round trip');assert(near(textureCycleRate({buchlaRate:.4}),.08*170**.4),'legacy Texture rate unchanged');assert(textureCycleRate({cycleHz:.001})===.001,'Texture ultra-slow rate');lines.push('PASS logarithmic LFO range: .001–18 Hz; legacy Texture rates unchanged');
+ for(const type of ['mono','poly','texture','acid']){
+  await independentGroups(type);
+  const base=await pitch(type,0),high=await pitch(type,12),low=await pitch(type,-12),live=await pitch(type,0,true);
+  assert(Math.abs(base.first-220)<7,type+' base pitch '+base.first);assert(Math.abs(high.first-440)<7,type+' +12 semitones '+high.first);assert(Math.abs(low.first-110)<7,type+' −12 semitones '+low.first);assert(Math.abs(live.first-220)<7&&Math.abs(live.last-440)<7,type+' coarse changes sustained voice '+JSON.stringify(live));assert(near(live.detune,1200,.1),type+' detune baseline');lines.push('PASS '+type+': rendered ±12-semitone tuning, live octave change, and independent oscillator groups');results.textContent=lines.join('\n');
+ }
+ document.documentElement.dataset.result='passed';results.textContent=lines.join('\n');
+}catch(error){results.textContent=lines.join('\n')+'\nFAIL '+error.stack;document.documentElement.dataset.result='failed';throw error}
+</script></html>

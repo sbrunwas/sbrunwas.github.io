@@ -103,7 +103,7 @@
 
 .cs10-plots .cs10-stereo{display:none}@media(min-width:1100px){.cs10-plots{grid-template-columns:1fr 1fr 160px}.cs10-plots .cs10-stereo{display:block}}
 </style><script type="module">
-import {createRackInstrument} from "./rack-devices.js?v=additive-cv-20261020";
+import {createRackInstrument} from "./rack-devices.js?v=slow-coarse-20261020";
 import {createSamplerRack} from "./sampler.js";
 import {createKickSidechain,kickAtStep,sidechainTiming} from "./sidechain.js";
 import {HARMONY_DEFAULTS,mountHarmonyPanel,linkHarmony,normalizeHarmony} from "./harmony.js";
@@ -194,7 +194,7 @@ return {createConductor};
 })();
 import {AfterglowAudio} from "./audio.js";
 import {validateState,validateSamples} from "./state.js";
-import {createBass01} from "./bass01.js?v=edge-patch-20261020-2";
+import {createBass01} from "./bass01.js?v=slow-coarse-20261020";
 (()=>{
 const root=document.getElementById('clawstudio-root');if(root.dataset.loaded)return;root.dataset.loaded='1';
 const $=id=>root.querySelector('#'+id), all=q=>[...root.querySelectorAll(q)],clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
@@ -570,7 +570,7 @@ $('c-rec').onclick=async()=>{
   }catch(error){rec=false;$('c-status').textContent='Could not start recorder: '+error.message}
 };
 for(let i=0;i<16;i++){let o=document.createElement('option');o.value=i;o.textContent=String(i+1).padStart(2,'0');$('c-pat').append(o)}buildRackDials('voice','c-voiceknobs',rackParams);buildRackDials('step','c-stepknobs',stepParams);renderRack();renderVoice();panel();A=current();B={...A,'acid.cut':.78,'drums.delay':.47,'fx.feedback':.78,'fx.drive':.6,'fx.space':.89,'sample.cut':.3};links=Object.keys(B).filter(k=>Math.abs(A[k]-B[k])>.001);morph();
-function studioSnapshot(){return {drumPattern:drum.selectedPattern,bassPattern:bass01.state.pattern,polyPattern:extraRacks.poly.state.pattern,texturePattern:extraRacks.texture.state.pattern,acidPattern:extraRacks.acid.state.pattern,polyArp:JSON.parse(JSON.stringify(extraRacks.poly.state.polyArp)),texturePatch:JSON.parse(JSON.stringify(extraRacks.texture.state.patchRoutes)),textureBuchla:Object.fromEntries(Object.entries(extraRacks.texture.state.p).filter(([k])=>k.startsWith('buchla'))),channels:Object.fromEntries(Object.entries(channels).map(([id,c])=>[id,{v:{...c.v},mute:c.mute,sc:c.sc}])),masterFX:{...fx},masterPerformance:masterPerformance.exportState(),sidechain:{...kickSidechain.params},harmony:{...harmonyState},monoRoot:bass01.state.root,polyRoot:extraRacks.poly.state.root,textureRoot:extraRacks.texture.state.root,acidRoot:extraRacks.acid.state.root}}
+function studioSnapshot(){return {drumPattern:drum.selectedPattern,bassPattern:bass01.state.pattern,polyPattern:extraRacks.poly.state.pattern,texturePattern:extraRacks.texture.state.pattern,acidPattern:extraRacks.acid.state.pattern,polyArp:JSON.parse(JSON.stringify(extraRacks.poly.state.polyArp)),texturePatch:JSON.parse(JSON.stringify(extraRacks.texture.state.patchRoutes)),textureBuchla:Object.fromEntries(Object.entries(extraRacks.texture.state.p).filter(([k])=>k.startsWith('buchla')||k==='cycleHz')),channels:Object.fromEntries(Object.entries(channels).map(([id,c])=>[id,{v:{...c.v},mute:c.mute,sc:c.sc}])),masterFX:{...fx},masterPerformance:masterPerformance.exportState(),sidechain:{...kickSidechain.params},harmony:{...harmonyState},monoRoot:bass01.state.root,polyRoot:extraRacks.poly.state.root,textureRoot:extraRacks.texture.state.root,acidRoot:extraRacks.acid.state.root}}
 function studioRecall(snapshot){
   if(!snapshot||typeof snapshot!=='object')return;
   if(snapshot.masterPerformance)masterPerformance.restoreState(snapshot.masterPerformance);
@@ -578,7 +578,7 @@ function studioRecall(snapshot){
   for(const [module,k] of [[bass01,'monoRoot'],[extraRacks.poly,'polyRoot'],[extraRacks.texture,'textureRoot'],[extraRacks.acid,'acidRoot']]){if(Number.isInteger(snapshot[k])&&snapshot[k]>=12&&snapshot[k]<=96){module.state.root=snapshot[k];module.refreshUI?.()}}
   if(snapshot.polyArp&&typeof snapshot.polyArp==='object'){extraRacks.poly.state.polyArp=JSON.parse(JSON.stringify(snapshot.polyArp));extraRacks.poly.refreshUI?.()}
   if(Array.isArray(snapshot.texturePatch)){const p=extraRacks.texture.state.patchRoutes;if(p){p.splice(0,p.length,...JSON.parse(JSON.stringify(snapshot.texturePatch)));}}
-  if(snapshot.textureBuchla){for(const [k,v] of Object.entries(snapshot.textureBuchla))if(k.startsWith('buchla')&&Number.isFinite(v))extraRacks.texture.state.p[k]=Math.max(0,Math.min(1,v));extraRacks.texture.getEngine()?.update?.()}
+  if(snapshot.textureBuchla){extraRacks.texture.state.p.cycleHz=Number.isFinite(snapshot.textureBuchla.cycleHz)?Math.max(.001,Math.min(18,snapshot.textureBuchla.cycleHz)):null;for(const [k,v] of Object.entries(snapshot.textureBuchla))if(k.startsWith('buchla')&&Number.isFinite(v))extraRacks.texture.state.p[k]=Math.max(0,Math.min(1,v));extraRacks.texture.getEngine()?.update?.()}
   if(snapshot.texturePatch||snapshot.textureBuchla)extraRacks.texture.refreshUI?.();
   if(Number.isInteger(snapshot.drumPattern)&&snapshot.drumPattern>=0&&snapshot.drumPattern<16){drum.selectedPattern=snapshot.drumPattern;syncDrums();renderRack();renderVoice();}
   for(const [module,field,selector] of [[bass01,'bassPattern','#c-bass-mount #b01-pattern'],[extraRacks.poly,'polyPattern','#c-poly-mount #cri-pattern'],[extraRacks.texture,'texturePattern','#c-texture-mount #cri-pattern'],[extraRacks.acid,'acidPattern','#c-acid-mount #cri-pattern']]){
@@ -617,11 +617,13 @@ function restoreRackProject(module,saved,type){
  if(!saved||!Array.isArray(saved.patterns)||saved.patterns.length!==8)throw Error('Invalid '+type+' instrument data');
  const state=module.state;
  if(type==='mono'){
-  Object.assign(state,structuredClone(saved));
+  const currentParams=state.params;for(const key of ['coarse1','coarse2','coarseStack','coarseSub','coarseFM'])currentParams[key]=0;Object.assign(currentParams,structuredClone(saved.params||{}));
+  Object.assign(state,structuredClone(saved));state.params=currentParams;
   module.getEngine()?.update?.(state.params);
  }else{
   const currentParams=state.p;
   const routes=type==='texture'?state.patchRoutes:null;
+  for(const key of ['coarse1','coarse2','coarse3'])if(key in currentParams)currentParams[key]=0;if('cycleHz' in currentParams)currentParams.cycleHz=null;
   Object.assign(currentParams,structuredClone(saved.p||{}));
   Object.assign(state,structuredClone(saved));state.p=currentParams;
   if(type==='texture'&&routes){routes.splice(0,routes.length,...(Array.isArray(saved.patchRoutes)?saved.patchRoutes:[]));state.patchRoutes=routes}
