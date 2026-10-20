@@ -1,0 +1,38 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Patchbay audio regression tests</title><pre id="results">Running…</pre><script type="module">
+import {createRackInstrument} from '../clawstudio/rack-devices.js';
+import {clawPatchbay} from '../clawstudio/poly-modular.js';
+const results=document.querySelector('#results');const lines=[];
+const assert=(ok,message)=>{if(!ok)throw Error(message)};
+const difference=(a,b,start=0,end=a.length)=>{let sum=0;for(let i=start;i<end;i++)sum+=(a[i]-b[i])**2;return Math.sqrt(sum/(end-start))};
+async function render(type,{patched=false,live=false,unplug=false,target=null}={}){
+ const originalRandom=Math.random;Math.random=()=>.25;
+ const mount=document.createElement('div');document.body.append(mount);const rack=createRackInstrument(mount,type);
+ const p=rack.state.p;Object.assign(p,{attack:0,decay:.2,sustain:1,release:.1,cutoff:.3,res:.15,env:0,motion:0,evolve:0,depth:0,filterEnv:0,space:0,chorus:0,delay:0,feedback:0,filter2:0,level:.6});
+ if(type==='texture'){p.engine='WAVETABLE';p.pace='DRONE';p.filterB='LOWPASS';p.filter2=1;p.buchlaLpg=0;p.buchlaFold=0;rack.state.patchRoutes.splice(0)}
+ const ctx=new OfflineAudioContext(2,48000*2,48000),engine=rack.init(ctx,ctx.destination);
+ const route=type==='poly'?{source:'LFO A',dest:target||'LP FREQ',depth:.7}:{source:'MOD OSC',target:target||'FILTER',amount:.7};
+ if(patched){if(type==='poly')engine.setPatch([route],{a:2,b:.5,hold:3});else{rack.state.patchRoutes.push(route);p.buchlaRate=Math.log(2/.08)/Math.log(170);engine.update()}}
+ engine.note(48,0,1.8);
+ // Offline rendering advances faster than wall-clock timers; initialize control-rate values explicitly.
+ if(type==='texture'){clearInterval(engine._tick);engine.motion()}
+ if(live||unplug){ctx.suspend(.75).then(()=>{if(live){p.cutoff=.75;engine.update()}if(unplug){if(type==='poly')engine.setPatch([],engine.patchRates);else{rack.state.patchRoutes.splice(0);engine.syncPatch()}}ctx.resume()})}
+ try{const buffer=await ctx.startRendering();const audio=new Float32Array(buffer.getChannelData(0));assert(audio.every(Number.isFinite),type+' finite samples');return audio}finally{rack.dispose();mount.remove();Math.random=originalRandom}
+}
+try{
+ for(const type of ['poly','texture']){
+  const plain=await render(type),modulated=await render(type,{patched:true}),live=await render(type,{patched:true,live:true}),unplugged=await render(type,{patched:true,unplug:true});
+  assert(difference(plain,modulated,12000,30000)>1e-4,type+' LFO changes rendered audio');
+  assert(difference(modulated,live,1000,30000)<1e-7,type+' no change before knob movement');
+  assert(difference(modulated,live,50000,80000)>1e-4,type+' live cutoff remains audible with LFO attached');
+  assert(difference(plain,unplugged,60000,85000)<1e-5,type+' unplug returns to unmodulated base');
+  const extras=type==='poly'?['DETUNE','OSC MIX','OSC2 LEVEL','FILTER ENV','PAN']:['FILTER 2','RESONANCE','RES 2','PITCH','LEVEL'];
+  for(const target of extras){const audio=await render(type,{patched:true,target});assert(difference(plain,audio,2500,30000)>1e-6,type+' new input changes rendered audio: '+target)}
+  const mount=document.createElement('div');document.body.append(mount);const rack=createRackInstrument(mount,type),ctx=new OfflineAudioContext(2,48000,48000),engine=rack.init(ctx,ctx.destination);engine.note(60,0,.5);engine.note(64,.1,.5);
+  const source=type==='poly'?'LFO A':'MOD OSC';assert(engine.voices[0].cv.getSource(source)===engine.voices[1].cv.getSource(source),type+' voices share free-running LFO');
+  const targets=clawPatchbay.DEST_IDS[type];assert(targets.length>8,type+' expanded patch inputs');
+  for(const target of targets){const data={source,dest:target,depth:-.5};if(type==='poly')engine.setPatch([data],engine.patchRates);else{rack.state.patchRoutes.splice(0,rack.state.patchRoutes.length,{source,target,amount:-.5});engine.syncPatch()}assert(engine.voices[0].cv.routes.some(r=>r.dest===target),type+' route accepted '+target)}
+  rack.dispose();mount.remove();lines.push('PASS '+type+': audible LFO, live cutoff on sustained voice, unplug restores base, shared free-running phase, expanded inputs');results.textContent=lines.join('\n');
+ }
+ document.documentElement.dataset.result='passed';
+}catch(error){results.textContent=lines.join('\n')+'\nFAIL '+error.stack;document.documentElement.dataset.result='failed';throw error}
+</script></html>

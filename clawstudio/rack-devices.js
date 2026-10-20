@@ -2,8 +2,8 @@
 // Three playable instrument modules share the host AudioContext, transport and routing.
 import {newPolyArp,arpEventsAtStep} from './poly-arp.js';
 import {attachPolyArp} from './poly-arp-ui.js';
-import {clawPatchbay} from './poly-modular.js?v=edge-patch-20261020-2';
-import {buchlaParamDefaults,BUCHLA_DEFAULT_ROUTES,attachBuchlaPanel,patchModulation} from './texture-patch.js?v=edge-patch-20261020-2';
+import {clawPatchbay} from './poly-modular.js?v=additive-cv-20261020';
+import {buchlaParamDefaults,BUCHLA_DEFAULT_ROUTES,attachBuchlaPanel,patchModulation} from './texture-patch.js?v=additive-cv-20261020';
 const TAU=2*Math.PI, cap=(n,a=0,b=1)=>Math.max(a,Math.min(b,n)), hz=n=>440*Math.pow(2,(n-69)/12);
 const midiName=n=>['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][((n%12)+12)%12]+(Math.floor(n/12)-1);
 const ease=(v,min,max)=>min*Math.pow(max/min,cap(v));
@@ -101,7 +101,7 @@ const templates={poly:[0,4,7,11,12,7,4,11,0,4,7,12,11,7,4,2],texture:[0,4,7,11,0
 function freshSteps(type){return Array.from({length:64},(_,i)=>({on:type==='texture'?i%8===0:type==='poly'?i%4===0:[0,2,3,6,8,11,12,14].includes(i%16),note:templates[type][i%16],accent:i%8===0,slide:type==='acid'&&[3,11,14].includes(i%16),gate:.7}));}
 function en(g,t,attack,decay,sustain,release,dur,level=1){const a=.002+attack*1.3,d=.025+decay*2.1,r=.03+release*3.2,gate=Math.max(.08,dur);g.setValueAtTime(.0001,t);g.linearRampToValueAtTime(level,t+a);g.setTargetAtTime(Math.max(.0001,sustain*level),t+a,Math.max(.01,d/3));g.setTargetAtTime(.0001,t+gate,Math.max(.01,r/3));return t+gate+r*3}
 function stage(g,t,a,d,s,r,len,level=1){const at=.003+Math.pow(a,2)*1.8,dc=.025+d*d*2,rt=.035+r*r*4,gate=Math.max(.05,len);g.setValueAtTime(.0001,t);g.linearRampToValueAtTime(level,t+at);g.setTargetAtTime(Math.max(.0001,s*level),t+at,Math.max(.006,dc/3));g.setTargetAtTime(.0001,t+gate,Math.max(.012,rt/3));return t+gate+rt*3}
-function oscillator(ctx,wave,hz0,t,end,gain,dest){const o=ctx.createOscillator(),a=ctx.createGain();o.type=wave;o.frequency.setValueAtTime(Math.min(18000,hz0),t);a.gain.value=gain;o.connect(a);a.connect(dest);o.start(t);o.stop(end);return o}
+function oscillator(ctx,wave,hz0,t,end,gain,dest){const o=ctx.createOscillator(),a=ctx.createGain();o.type=wave;o.frequency.setValueAtTime(Math.min(18000,hz0),t);a.gain.value=gain;o.connect(a);a.connect(dest);o.start(t);o.stop(end);o.levelNode=a;return o}
 function impulse(ctx,seconds=1.8){const len=Math.round(ctx.sampleRate*seconds),b=ctx.createBuffer(2,len,ctx.sampleRate);let seed=91261;for(let ch=0;ch<2;ch++){const a=b.getChannelData(ch);for(let i=0;i<len;i++){seed=(Math.imul(seed,1664525)+1013904223)|0;a[i]=((seed>>>9)/4194304-1)*Math.pow(1-i/len,2.65)}}return b}
 function makeFX(ctx,dest,reverbMix=.35){let main=ctx.createGain(),verb=ctx.createConvolver(),wet=ctx.createGain(),delay=ctx.createDelay(1.5),feed=ctx.createGain(),delayWet=ctx.createGain();verb.buffer=impulse(ctx);main.connect(dest);main.connect(verb);verb.connect(wet);wet.connect(dest);main.connect(delay);delay.connect(feed);feed.connect(delay);delay.connect(delayWet);delayWet.connect(dest);feed.gain.value=.27;delay.delayTime.value=.375;wet.gain.value=reverbMix;delayWet.gain.value=.16;return {input:main,wet,delayWet,feed,delay};}
 const tableCache=new WeakMap();
@@ -129,23 +129,37 @@ function createEnsemble(ctx,input,dest){
  return {wet,leftLfo,rightLfo,leftDepth,rightDepth,dispose(){leftLfo.stop();rightLfo.stop();wet.disconnect()}};
 }
 class PolyEngine{
- constructor(ctx,dest,params){this.ctx=ctx;this.p=params;this.fx=makeFX(ctx,dest,.09);this.ensemble=createEnsemble(ctx,this.fx.input,dest);this.voices=[];this.patchRoutes=[];this.patchRates=clawPatchbay.ratesSafe();this.update()}
- update(){const p=this.p,t=this.ctx.currentTime;this.fx.wet.gain.setTargetAtTime(p.chorus*.055,t,.05);this.ensemble.wet.gain.setTargetAtTime(p.chorus*.46,t,.04);this.ensemble.leftLfo.frequency.setTargetAtTime(.16+p.modRate*.8,t,.08);this.ensemble.rightLfo.frequency.setTargetAtTime(.22+p.modRate*.94,t,.08);this.ensemble.leftDepth.gain.setTargetAtTime(.001+p.motion*.007,t,.08);this.ensemble.rightDepth.gain.setTargetAtTime(.001+p.motion*.009,t,.08);this.fx.delayWet.gain.setTargetAtTime(p.delay*.36,t,.05);this.fx.feed.gain.setTargetAtTime(.16+p.delay*.45,t,.05)}
+ constructor(ctx,dest,params){this.ctx=ctx;this.p=params;this.fx=makeFX(ctx,dest,.09);this.ensemble=createEnsemble(ctx,this.fx.input,dest);this.voices=[];this.patchRoutes=[];this.patchRates=clawPatchbay.ratesSafe();this.modulators=clawPatchbay.makeAudio(ctx,'poly',{}, {rates:this.patchRates},{sharedClock:true});this.update()}
+ update(){const p=this.p,t=this.ctx.currentTime;this.fx.wet.gain.setTargetAtTime(p.chorus*.055,t,.05);this.ensemble.wet.gain.setTargetAtTime(p.chorus*.46,t,.04);this.ensemble.leftLfo.frequency.setTargetAtTime(.16+p.modRate*.8,t,.08);this.ensemble.rightLfo.frequency.setTargetAtTime(.22+p.modRate*.94,t,.08);this.ensemble.leftDepth.gain.setTargetAtTime(.001+p.motion*.007,t,.08);this.ensemble.rightDepth.gain.setTargetAtTime(.001+p.motion*.009,t,.08);this.fx.delayWet.gain.setTargetAtTime(p.delay*.36,t,.05);this.fx.feed.gain.setTargetAtTime(.16+p.delay*.45,t,.05);
+ for(const v of this.voices){if(v.end<=t)continue;const now=Math.max(t,v.start);
+  v.cut.frequency.setTargetAtTime(ease(p.cutoff,100,18000),now,.025);v.cut.Q.setTargetAtTime(.65+p.res*14,now,.025);
+  v.out.gain.setTargetAtTime(p.level*.5,now,.025);v.filterEnvGain.gain.setTargetAtTime(p.env*1800,now,.025);
+  const mix=superSawMix(p.mix),detune=superSawDetune(p.detune);
+  v.osc.forEach((o,i)=>{const nominal=v.hz*Math.pow(2,(p.tune-.5)*.2);o.frequency.setTargetAtTime(v.kind==='SUPER SAW'?nominal*(1+SUPER_SAW_OFFSETS[i]*detune):nominal,now,.025);
+   o.detune.setTargetAtTime(v.kind==='SUPER SAW'?0:i===0?0:((i%2?-1:1)*Math.ceil(i/2)*3.7*p.detune*3.4),now,.025);
+   v.layers[i].gain.setTargetAtTime(v.kind==='SUPER SAW'?(i===3?mix.center:mix.side)*1.04:i===0?1:(p.mix/(v.osc.length-1))*1.25,now,.025);
+   if(v.kind==='SHAPE'||v.kind==='FORMANT')o.setPeriodicWave(wave(this.ctx,v.kind==='SHAPE'?'ORGANIC':'VOCAL',p.shape));
+  });
+  v.second.frequency.setTargetAtTime(v.hz*2**((p.shape-.5)*.3),now,.025);
+ }
+ }
  setPatch(routes,rates){
    this.patchRoutes=clawPatchbay.routesSafe(routes,'poly');
-   this.patchRates=clawPatchbay.ratesSafe(rates);
+   this.patchRates=clawPatchbay.ratesSafe(rates);this.modulators.setRates(this.patchRates);
    for(const v of this.voices){v.cv?.setRoutes(this.patchRoutes);v.cv?.setRates(this.patchRates)}
  }
- setPatchRates(rates){this.patchRates=clawPatchbay.ratesSafe(rates);for(const v of this.voices)v.cv?.setRates(this.patchRates)}
+ setPatchRates(rates){this.patchRates=clawPatchbay.ratesSafe(rates);this.modulators.setRates(this.patchRates);for(const v of this.voices)v.cv?.setRates(this.patchRates)}
  note(midi,t,dur,velocity=1){const p=this.p,ctx=this.ctx,f=hz(midi),attack=p.attack,release=p.release;
 // Eight-voice polyphony cap with gentle voice stealing.
- this.voices=this.voices.filter(v=>{if(v.end>ctx.currentTime)return true;v.cv?.dispose();return false});
+ this.voices=this.voices.filter(v=>{if(v.end>ctx.currentTime)return true;v.cv?.dispose();v.filterEnvelope?.disconnect();return false});
  if(this.voices.length>=8){const oldest=this.voices.shift();oldest.cv?.dispose();oldest.amp.gain.cancelScheduledValues(t);oldest.amp.gain.setTargetAtTime(.0001,t,.007);}
  const cut=ctx.createBiquadFilter();cut.type='lowpass';cut.frequency.setValueAtTime(ease(p.cutoff,110,18500),t);cut.Q.value=.65+p.res*14;
- const out=ctx.createGain();out.gain.value=.5;const amp=ctx.createGain();amp.gain.value=.0001;cut.connect(amp);amp.connect(out);out.connect(this.fx.input);
-let peak=ease(p.cutoff,100,18000),high=Math.min(18000,peak*(1+p.env*3.5));cut.frequency.setValueAtTime(high,t);cut.frequency.setTargetAtTime(peak,t+.008,Math.max(.02,p.decay*.5));
-const end=stage(amp.gain,t,attack,p.decay,p.sustain,release,dur,p.level*.36*Math.max(.1,Math.min(1,velocity)));
-const oscs=[];let src=ctx.createGain();src.connect(cut);
+ const out=ctx.createGain();out.gain.value=p.level*.5;const pan=ctx.createStereoPanner();pan.pan.value=0;const amp=ctx.createGain();amp.gain.value=.0001;cut.connect(amp);amp.connect(out);out.connect(pan);pan.connect(this.fx.input);
+cut.frequency.setValueAtTime(ease(p.cutoff,100,18000),t);
+const end=stage(amp.gain,t,attack,p.decay,p.sustain,release,dur,.36*Math.max(.1,Math.min(1,velocity)));
+const filterEnvelope=ctx.createConstantSource(),filterEnvGain=ctx.createGain();filterEnvGain.gain.value=p.env*1800;
+filterEnvelope.offset.setValueAtTime(1,t);filterEnvelope.offset.setTargetAtTime(0,t+.008,Math.max(.02,p.decay*.5));filterEnvelope.connect(filterEnvGain);filterEnvGain.connect(cut.detune);filterEnvelope.start(t);filterEnvelope.stop(end+.08);
+const oscs=[],layerGains=[];let src=ctx.createGain();src.connect(cut);
 const layers=p.wave==='SUPER SAW'?7:p.wave==='SHAPE'||p.wave==='FORMANT'?3:2;
  const detuneCurve=superSawDetune(p.detune),mixGains=superSawMix(p.mix);
 for(let i=0;i<layers;i++){
@@ -164,19 +178,23 @@ for(let i=0;i<layers;i++){
  if(p.wave==='FEEDBACK'){const ws=ctx.createWaveShaper();const curve=new Float32Array(256);for(let k=0;k<curve.length;k++){const v=k/127.5-1;curve[k]=Math.tanh(v*(1+p.shape*24))}ws.curve=curve;o.connect(g);g.connect(ws);ws.connect(src)}else{o.connect(g);g.connect(src)}
  // Starting ahead of the gate decorrelates saw phases across notes without a custom oscillator.
  const phaseHeadroom=1/Math.max(1,o.frequency.value);
- o.start(Math.max(ctx.currentTime,t-Math.random()*phaseHeadroom));o.stop(end+.04);oscs.push(o)}
+ o.start(Math.max(ctx.currentTime,t-Math.random()*phaseHeadroom));o.stop(end+.04);oscs.push(o);layerGains.push(g)}
  const second=oscillator(ctx,p.osc2==='PULSE'?'square':p.osc2==='TRI'?'triangle':'sawtooth',f*2**((p.shape-.5)*.3),t,end+.04,.22,src);
  const previous=this.voices.slice().reverse().find(v=>v.end>t&&v.osc?.length);
  const cv=clawPatchbay.makeAudio(ctx,'poly',{
-    'LP FREQ':cut.frequency,'PITCH':oscs.map(o=>o.detune).concat([second.detune]),
-    'OSC2 PITCH':second.detune,'RESONANCE':cut.Q,'LEVEL':out.gain
+    'LP FREQ':cut.detune,'PITCH':oscs.map(o=>o.detune).concat([second.detune]),
+    'OSC2 PITCH':second.detune,'RESONANCE':cut.Q,'LEVEL':out.gain,
+    'DETUNE':oscs.map((o,i)=>({param:o.detune,scale:(i%2?-1:1)*70})),
+    'OSC MIX':layerGains.slice(1).map(g=>({param:g.gain,scale:.15})),
+    'OSC2 LEVEL':{param:second.levelNode.gain,scale:.2},'FILTER ENV':{param:filterEnvGain.gain,scale:1600},'PAN':{param:pan.pan,scale:.8}
  },{routes:this.patchRoutes,rates:this.patchRates},{startAt:t,stopAt:end+.08,
+    sharedSources:this.modulators.getSources(),scales:{'LP FREQ':2400},
     seed:(midi*2654435761+Math.round(t*ctx.sampleRate))>>>0,
     previousVoice:previous?{oscillator:previous.osc[0],envelope:previous.cv?.getSource('ENV')}:null});
  cv.noteOn(t,dur,{attack:.003+p.attack*p.attack*1.8,decay:.025+p.decay*p.decay*2,
    sustain:p.sustain,release:.035+p.release*p.release*4,velocity});
- this.voices.push({end,amp,osc:oscs,cv});}
- dispose(){for(const v of this.voices)v.cv?.dispose();this.voices=[];this.ensemble.dispose();this.fx.input.disconnect();this.fx.wet.disconnect();this.fx.delayWet.disconnect()}
+ this.voices.push({end,start:t,amp,osc:oscs,cv,cut,out,pan,hz:f,kind:p.wave,layers:layerGains,second,filterEnvelope,filterEnvGain});}
+ dispose(){this.modulators.dispose();for(const v of this.voices){v.cv?.dispose();v.filterEnvelope?.disconnect()}this.voices=[];this.ensemble.dispose();this.fx.input.disconnect();this.fx.wet.disconnect();this.fx.delayWet.disconnect()}
 }
 // Six complementary engines deliberately use DIFFERENT synthesis paths.
 // Unlike firmware emulation, these are original WebAudio algorithms inspired by
@@ -192,35 +210,38 @@ function textureRoute(ctx,pre,a,b,sum,mode){
  else{pre.connect(a);a.connect(b);b.connect(sum)}
 }
 class TextureEngine{
- constructor(ctx,dest,params){this.ctx=ctx;this.p=params;this.patchRoutes=[];this.fx=makeFX(ctx,dest,.42);this.voices=[];this._tick=setInterval(()=>this.motion(),84);this.update()}
- update(){const p=this.p,t=this.ctx.currentTime;this.fx.wet.gain.setTargetAtTime(p.space*.62,t,.08);this.fx.delayWet.gain.setTargetAtTime(p.feedback*.38,t,.06);this.fx.feed.gain.setTargetAtTime(Math.min(.72,.16+p.feedback*.4),t,.06)}
+ constructor(ctx,dest,params){this.ctx=ctx;this.p=params;this.patchRoutes=[];this.fx=makeFX(ctx,dest,.42);this.voices=[];this.phaseOrigin=ctx.currentTime;this.modulators=clawPatchbay.makeAudio(ctx,'texture',{}, {rates:this.cvRates()},{sharedClock:true});this._tick=setInterval(()=>this.motion(),25);this.update()}
+ cvRates(){const rate=.08*Math.pow(170,cap(this.p.buchlaRate??.4));return {a:rate,b:rate*.27,hold:rate*.72}}
+ syncPatch(){const routes=this.patchRoutes.map(r=>({source:r.source,dest:r.target,depth:r.amount}));for(const v of this.voices)v.cv?.setRoutes(routes)}
+ update(){const p=this.p,t=this.ctx.currentTime;this.fx.wet.gain.setTargetAtTime(p.space*.62,t,.08);this.fx.delayWet.gain.setTargetAtTime(p.feedback*.38,t,.06);this.fx.feed.gain.setTargetAtTime(Math.min(.72,.16+p.feedback*.4),t,.06);this.modulators.setRates(this.cvRates());this.syncPatch();this.motion()}
  motion(){const ctx=this.ctx,p=this.p,t=ctx.currentTime;
-  for(const v of this.voices){if(v.end<t+.02)continue;
+  for(const v of this.voices){if(v.end<t+.02||v.start>t)continue;
    const phase=t*(.018+p.rate*.45)+(v.seed||0),drift=Math.sin(phase*TAU)*p.motion*p.depth,slow=Math.sin((phase*.317+.22)*TAU);
    const age=Math.max(0,t-v.start),env=(1-Math.exp(-age/(.02+p.envAttack*2)))*Math.exp(-age/(.05+p.envDecay*4));
    const modulation=patchModulation(this.patchRoutes,p,v,t);
    const mod=drift+slow*p.evolve*.33;
-   const cutoff=ease(cap(p.cutoff+mod*.32+p.filterEnv*env*.2+modulation.FILTER*.25),45,16200);
+   const cutoff=ease(cap(p.cutoff+mod*.32+p.filterEnv*env*.2),45,16200);
    const cutoff2=ease(cap(p.filter2+mod*.2),35,14900);
    v.f1.frequency.setTargetAtTime(cutoff,t,.05);v.f2.frequency.setTargetAtTime(cutoff2,t,.05);
    v.f1.Q.setTargetAtTime(.65+p.res*10,t,.06);v.f2.Q.setTargetAtTime(.6+p.ring*11,t,.06);
-   if(v.carriers){for(let i=0;i<v.carriers.length;i++){const o=v.carriers[i];if(v.kind!=='WAVETABLE')continue;const pos=cap(p.wave+Math.sin(phase*TAU+i*1.7)*p.depth*.49+modulation.TIMBRE*(p.buchlaIndex??.3));const bucket=p.table+':'+Math.round(pos*64);if(v.buckets[i]!==bucket){o.setPeriodicWave(wave(ctx,p.table,pos));v.buckets[i]=bucket}}}
-   if(v.modDepth)v.modDepth.gain.setTargetAtTime(v.hz*(.04+p.fm*(.6+p.character*3))*(.6+(.5+drift)*p.evolve)*(1+modulation.FM*(p.buchlaIndex??.3)),t,.09);
+   if(v.carriers){for(let i=0;i<v.carriers.length;i++){const o=v.carriers[i];if(v.kind!=='WAVETABLE')continue;const pos=cap(p.wave+Math.sin(phase*TAU+i*1.7)*p.depth*.49+modulation.TIMBRE*(.25+.75*(p.buchlaIndex??.3)));const bucket=p.table+':'+Math.round(pos*64);if(v.buckets[i]!==bucket){o.setPeriodicWave(wave(ctx,p.table,pos));v.buckets[i]=bucket}}}
+   if(v.modDepth)v.modDepth.gain.setTargetAtTime(v.hz*(.04+p.fm*(.6+p.character*3))*(.6+(.5+drift)*p.evolve),t,.09);
    if(v.bands){for(let i=0;i<v.bands.length;i++)v.bands[i].frequency.setTargetAtTime(Math.min(11500,v.bandBase[i]*(1+mod*.4)),t,.08)}
-   const foldAmount=cap((p.buchlaFold??0)+modulation.FOLD*(p.buchlaIndex??.3)),bucket=Math.round(foldAmount*22);
+   const foldAmount=cap((p.buchlaFold??0)+modulation.FOLD*(.25+.75*(p.buchlaIndex??.3))),bucket=Math.round(foldAmount*22);
    if(v.foldBucket!==bucket){v.fold.curve=wavefoldCurve(bucket/22);v.foldBucket=bucket}
    const depth=cap(p.buchlaLpg??0),decay=.08+(p.buchlaDecay??.5)*2.8;
-   const response=cap(Math.exp(-age/decay)+modulation.LPG*(p.buchlaIndex??.3));
+   const response=cap(Math.exp(-age/decay));
    const open=1-depth+depth*response;
    v.lpgFilter.frequency.setTargetAtTime(90+16900*open*open,t,.06);
    v.lpgGain.gain.setTargetAtTime(.05+.95*open,t,.045);
-   v.pan.pan.setTargetAtTime(Math.max(-1,Math.min(1,Math.sin(phase*1.3*TAU)*p.spread*.75+modulation.PAN*.75)),t,.08);
+   v.level.gain.setTargetAtTime(p.level,t,.03);
+   v.pan.pan.setTargetAtTime(Math.max(-1,Math.min(1,Math.sin(phase*1.3*TAU)*p.spread*.75)),t,.08);
   }
-  this.voices=this.voices.filter(v=>v.end>t);
+  this.voices=this.voices.filter(v=>{if(v.end>t)return true;v.cv?.dispose();return false});
  }
  note(midi,t,dur){const p=this.p,ctx=this.ctx,f=hz(midi),kind=TEXTURE_ENGINES.includes(p.engine)?p.engine:'WAVETABLE';
-  this.voices=this.voices.filter(v=>v.end>ctx.currentTime);
-  if(this.voices.length>=9){const oldest=this.voices.shift();oldest.amp.gain.cancelScheduledValues(t);oldest.amp.gain.setTargetAtTime(.0001,t,.012)}
+  this.voices=this.voices.filter(v=>{if(v.end>ctx.currentTime)return true;v.cv?.dispose();return false});
+  if(this.voices.length>=9){const oldest=this.voices.shift();oldest.cv?.dispose();oldest.amp.gain.cancelScheduledValues(t);oldest.amp.gain.setTargetAtTime(.0001,t,.012)}
   const pre=ctx.createGain(),f1=ctx.createBiquadFilter(),f2=ctx.createBiquadFilter(),sum=ctx.createGain(),amp=ctx.createGain(),pan=ctx.createStereoPanner();
   f1.type=TEXTURE_FILTERS[p.filterA]||'lowpass';f2.type=TEXTURE_FILTERS[p.filterB]||'highpass';
   f1.frequency.value=ease(p.cutoff,45,16200);f2.frequency.value=ease(p.filter2,35,14900);
@@ -228,18 +249,18 @@ class TextureEngine{
   const fold=ctx.createWaveShaper();fold.curve=wavefoldCurve(p.buchlaFold??0);
   pre.connect(fold);textureRoute(ctx,fold,f1,f2,sum,p.filterMode);
   const lpgFilter=ctx.createBiquadFilter(),lpgGain=ctx.createGain();lpgFilter.type='lowpass';lpgFilter.frequency.value=17000;lpgGain.gain.value=1;
-  sum.connect(lpgFilter);lpgFilter.connect(lpgGain);lpgGain.connect(amp);amp.connect(pan);pan.connect(this.fx.input);
+  sum.connect(lpgFilter);lpgFilter.connect(lpgGain);lpgGain.connect(amp);amp.connect(pan);const level=ctx.createGain();level.gain.value=p.level;pan.connect(level);level.connect(this.fx.input);
   const pace=p.pace==='PLUCK'?.18:p.pace==='PULSE'?.53:p.pace==='SWARM'?1.4:2.7;
   const length=Math.max(.1,dur,pace*(.45+p.evolve*1.3));
-  const end=stage(amp.gain,t,kind==='RESONATOR'?Math.min(.025,p.attack):(p.pace==='PLUCK'?Math.min(.08,p.attack):p.attack),p.decay,p.pace==='PLUCK'?Math.min(.16,p.sustain):p.sustain,p.release,length,p.level*.22);
-  const voice={kind,start:t,end,seed:Math.random(),hz:f,carriers:[],buckets:[],f1,f2,pan,amp,fold,lpgFilter,lpgGain,foldBucket:null,modDepth:null,bands:null,bandBase:null};
-  const osc=(shape,frequency,destination,gain=.5)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type=shape;o.frequency.setValueAtTime(Math.min(16000,frequency),t);g.gain.value=gain;o.connect(g);g.connect(destination);o.start(t);o.stop(end+.06);return o};
+  const end=stage(amp.gain,t,kind==='RESONATOR'?Math.min(.025,p.attack):(p.pace==='PLUCK'?Math.min(.08,p.attack):p.attack),p.decay,p.pace==='PLUCK'?Math.min(.16,p.sustain):p.sustain,p.release,length,.22);
+  const voice={kind,start:t,end,seed:Math.random(),phaseOrigin:this.phaseOrigin,hz:f,level,pitched:[],carriers:[],buckets:[],f1,f2,pan,amp,fold,lpgFilter,lpgGain,foldBucket:null,modDepth:null,bands:null,bandBase:null};
+  const osc=(shape,frequency,destination,gain=.5)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type=shape;o.frequency.setValueAtTime(Math.min(16000,frequency),t);g.gain.value=gain;o.connect(g);g.connect(destination);o.start(t);o.stop(end+.06);voice.pitched.push(o);return o};
   const bufNoise=(gain)=>{const src=ctx.createBufferSource(),g=ctx.createGain();src.buffer=textureNoise(ctx);src.loop=true;g.gain.value=gain;src.connect(g);g.connect(pre);src.start(t);src.stop(end+.06);return src};
   if(kind==='WAVETABLE'){
    for(let i=0;i<3;i++){const o=osc('sine',f*(i===2?2:1),pre,[.7,p.second*.4,p.third*.33][i]);o.detune.value=(i===0?0:i===1?-1:1)*p.spread*18;o.setPeriodicWave(wave(ctx,p.table,cap(p.wave+i*.13)));voice.carriers.push(o);voice.buckets.push(null)}
   }else if(kind==='FM MATRIX'){
-   const carrier=osc('sine',f,pre,.72);const mod1=ctx.createOscillator(),g1=ctx.createGain();mod1.frequency.value=f*(1+Math.round(p.wave*11));g1.gain.value=f*p.fm*(.4+p.character*8);mod1.connect(g1);g1.connect(carrier.frequency);mod1.start(t);mod1.stop(end+.06);voice.modDepth=g1;
-   if(p.third>.05){const mod2=ctx.createOscillator(),mg=ctx.createGain();mod2.frequency.value=f*(.51+p.ring*11);mg.gain.value=f*p.third*(1+p.second*4);mod2.connect(mg);mg.connect(mod1.frequency);mod2.start(t);mod2.stop(end+.06)}
+   const carrier=osc('sine',f,pre,.72);const mod1=ctx.createOscillator(),g1=ctx.createGain();mod1.frequency.value=f*(1+Math.round(p.wave*11));g1.gain.value=f*p.fm*(.4+p.character*8);mod1.connect(g1);g1.connect(carrier.frequency);mod1.start(t);mod1.stop(end+.06);voice.modDepth=g1;voice.pitched.push(mod1);
+   if(p.third>.05){const mod2=ctx.createOscillator(),mg=ctx.createGain();mod2.frequency.value=f*(.51+p.ring*11);mg.gain.value=f*p.third*(1+p.second*4);mod2.connect(mg);mg.connect(mod1.frequency);mod2.start(t);mod2.stop(end+.06);voice.pitched.push(mod2)}
   }else if(kind==='WAVEFOLD'){
    const fold=ctx.createWaveShaper();fold.curve=wavefoldCurve(Math.max(p.character,p.wave));
    const oscBus=ctx.createGain();oscBus.connect(fold);fold.connect(pre);osc('sine',f,oscBus,.8);if(p.second>.04)osc('triangle',f*(1+Math.round(p.wave*3)),oscBus,p.second*.48);
@@ -258,7 +279,7 @@ class TextureEngine{
     tail.gain.setValueAtTime(.0001,t);
     tail.gain.linearRampToValueAtTime(gain,t+.007);
     tail.gain.exponentialRampToValueAtTime(.0001,Math.min(end-.08,t+.13+p.evolve*2.8/(1+i*.42)));
-    partial.connect(tail);tail.connect(pre);partial.start(t);partial.stop(end+.05);
+    partial.connect(tail);tail.connect(pre);partial.start(t);partial.stop(end+.05);voice.pitched.push(partial);
    }
   }else if(kind==='NOISE'){
    bufNoise(.75);if(p.fm>.06)osc('triangle',f,pre,.2+p.fm*.35);
@@ -270,13 +291,25 @@ class TextureEngine{
    const carrier=ctx.createOscillator(),mod=ctx.createOscillator(),mult=ctx.createGain(),level=ctx.createGain();
    carrier.type='sine';carrier.frequency.value=f;mod.type='sine';mod.frequency.value=f*(.5+Math.round(p.wave*8)+p.character*.33);
    mult.gain.value=0;level.gain.value=.64;mod.connect(mult.gain);carrier.connect(mult);mult.connect(level);level.connect(pre);
-   mod.start(t);carrier.start(t);carrier.stop(end+.06);mod.stop(end+.06);
+   mod.start(t);carrier.start(t);carrier.stop(end+.06);mod.stop(end+.06);voice.pitched.push(carrier,mod);
    if(p.second>.02)osc('triangle',f*.5,pre,p.second*.18);
   }
+  // Every pitched engine has an additive FM input, even outside FM MATRIX mode.
+  if(!voice.modDepth&&voice.pitched.length){const mod=ctx.createOscillator(),depth=ctx.createGain();mod.frequency.value=f*2;depth.gain.value=0;mod.connect(depth);for(const o of voice.pitched)depth.connect(o.frequency);mod.start(t);mod.stop(end+.08);voice.patchFM=depth}
+  voice.cv=clawPatchbay.makeAudio(ctx,'texture',{
+   'FILTER':{param:f1.detune,scale:2400},'FILTER 2':{param:f2.detune,scale:2400},
+   'RESONANCE':{param:f1.Q,scale:8},'RES 2':{param:f2.Q,scale:8},
+   'PITCH':voice.pitched.map(o=>({param:o.detune,scale:700})),
+   'LEVEL':{param:level.gain,scale:.4},'PAN':{param:pan.pan,scale:.8},
+   'LPG':[{param:lpgFilter.detune,scale:1800},{param:lpgGain.gain,scale:.4}],
+   'FM':(voice.modDepth||voice.patchFM)?{param:(voice.modDepth||voice.patchFM).gain,scale:f*2}:null
+  },{routes:this.patchRoutes.map(r=>({source:r.source,dest:r.target,depth:r.amount})),rates:this.cvRates()},
+   {startAt:t,stopAt:end+.08,sharedSources:this.modulators.getSources()});
+  voice.cv.noteOn(t,length,{attack:.003,decay:.08+(p.buchlaDecay??.5)*2.8,sustain:0,release:.1});
   this.voices.push(voice);
  }
- retireVoices(){const t=this.ctx.currentTime;for(const v of this.voices){try{v.amp.gain.cancelScheduledValues(t);v.amp.gain.setTargetAtTime(.0001,t,.024)}catch{}}this.voices=[]}
- dispose(){clearInterval(this._tick);this.retireVoices();this.fx.input.disconnect();this.fx.wet.disconnect();this.fx.delayWet.disconnect()}
+ retireVoices(){const t=this.ctx.currentTime;for(const v of this.voices){v.cv?.dispose();try{v.amp.gain.cancelScheduledValues(t);v.amp.gain.setTargetAtTime(.0001,t,.024)}catch{}}this.voices=[]}
+ dispose(){clearInterval(this._tick);this.modulators.dispose();this.retireVoices();this.fx.input.disconnect();this.fx.wet.disconnect();this.fx.delayWet.disconnect()}
 }
 class AcidEngine{
  constructor(ctx,dest,p){this.ctx=ctx;this.p=p;this.stage=ctx.createGain();this.stage.gain.value=.0001;this.filter1=ctx.createBiquadFilter();this.filter1.type='lowpass';this.filter2=ctx.createBiquadFilter();this.filter2.type='lowpass';this.drive=ctx.createWaveShaper();this.output=ctx.createGain();this.osc=ctx.createOscillator();this.osc.type='sawtooth';this.osc.frequency.value=55;this.osc.connect(this.filter1);this.filter1.connect(this.filter2);this.filter2.connect(this.drive);this.drive.connect(this.stage);this.stage.connect(this.output);this.output.connect(dest);this.osc.start();this.lastNote=null;this.end=0;this.update()}
@@ -345,7 +378,7 @@ export function createRackInstrument(mount,type,{externalClock=false,tempo=()=>1
    setRates:r=>{polyModState().rates=clawPatchbay.ratesSafe(r);engine?.setPatchRates(polyModState().rates)}
  }):null;
  const persistentPatch=state.patchRoutes;
- const buchlaPanel=type==='texture'?attachBuchlaPanel(mount,persistentPatch,p):null;
+ const buchlaPanel=type==='texture'?attachBuchlaPanel(mount,persistentPatch,p,()=>{engine?.syncPatch();engine?.update()}):null;
  let page=0;const val=k=>p[k],syncUI=()=>{$$('[data-knob]').forEach(el=>{let v=cap(p[el.dataset.knob]);el.style.setProperty('--rot',(-135+v*270)+'deg');el.style.setProperty('--v',v);el.setAttribute('aria-valuenow',Math.round(v*100));mount.querySelector(`[data-val="${el.dataset.knob}"]`).textContent=Math.round(v*100)});$$('[data-opt]').forEach(el=>el.value=p[el.dataset.opt]);$$('[data-fader]').forEach(el=>{el.value=p[el.dataset.fader];const output=mount.querySelector(`[data-val="${el.dataset.fader}"]`);if(output)output.textContent=Math.round(p[el.dataset.fader]*100)});$('#cri-length').value=state.steps;$('#cri-pattern').value=state.pattern;$('#cri-root').value=state.root;showSteps();drawWave();polyArpPanel?.refresh();buchlaPanel?.refresh()};
  function drawWave(){const cv=$('.cri-wave');if(!cv||!cv.getContext)return;let c=cv.getContext('2d');if(!c)return;c.clearRect(0,0,680,115);c.strokeStyle=type==='texture'?'#153b56':'#fff';c.lineWidth=2;c.beginPath();for(let i=0;i<680;i++){let x=i/680*TAU*5;let kind=p.engine||'WAVETABLE';let y=kind==='NOISE'?Math.sin(x*7.7)*Math.sin(x*33.1)*.8:kind==='RESONATOR'?Math.sin(x)*Math.exp(-((i/680)*5)%1*3):kind==='RING'?Math.sin(x)*Math.sin(x*(2+p.character*12)):kind==='WAVEFOLD'?Math.sin(Math.sin(x)*(2+p.character*16)):kind==='FM MATRIX'?Math.sin(x+Math.sin(x*(1+p.wave*8))*p.fm*5):kind==='FORMANT'?Math.sin(x)*Math.sin(x*.4)*.6:Math.sin(x)*(1-p.wave)+Math.sin(3*x+p.wave*6)*p.wave*.45+Math.sin(7*x+p.fm*8)*p.ring*.7;let yy=56-y*29;if(i===0)c.moveTo(i,yy);else c.lineTo(i,yy)}c.stroke()}
  function showSteps(){for(const opt of $('#cri-note').options){opt.textContent=midiName(Math.max(0,Math.min(127,state.root+Number(opt.value))))}const host=$('#cri-steps');host.innerHTML='';let length=state.steps;host.style.setProperty('--cols',Math.min(16,length));for(let i=0;i<length;i++){let idx=i,s=state.patterns[state.pattern][idx],b=document.createElement('button');b.className='cri-step'+(s.on?' on':'')+(idx===selected?' editing':'')+(idx===lastSeq?' playhead':'');b.innerHTML=`<span>${String(idx+1).padStart(2,'0')}</span><strong>${midiName(state.root+s.note)}</strong><small>${s.accent?'▲':''}${s.slide?'↗':''}</small>`;b.onclick=()=>{if(selected===idx)s.on=!s.on;selected=idx;showSteps();editUI()};host.append(b)}editUI()}
