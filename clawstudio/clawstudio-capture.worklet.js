@@ -31,7 +31,7 @@ class ClawStudioCaptureProcessor extends AudioWorkletProcessor {
     } else if (m.type === 'startWav') {
       if (!Number.isSafeInteger(m.id)) return;
       if (this.wav) this.finish(this.wav, false);
-      this.wav = this.makeState(m.id,'wav',currentFrame,Math.floor(sampleRate * 150));
+      this.wav = this.makeState(m.id,'wav',currentFrame,Math.floor(sampleRate * 600));
     } else if (m.type === 'stopWav') {
       if (this.wav && this.wav.id === m.id) {
         this.finish(this.wav, false);
