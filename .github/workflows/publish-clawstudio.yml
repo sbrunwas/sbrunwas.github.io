@@ -49,6 +49,12 @@ jobs:
           cp "$RUNNER_TEMP/afterglow/web/dist/Schwung-GPL-LICENSE.txt" clawstudio/Schwung-GPL-LICENSE.txt
           cp "$RUNNER_TEMP/afterglow/web/dist/DaisySP-LICENSE.txt" clawstudio/DaisySP-LICENSE.txt
           printf '%s\n' '# ClawStudio' 'Browser-based modular performance studio. Original drum synthesis is packaged locally as WebAssembly; no fallback engine.' 'Source: https://github.com/sbrunwas/afterglow/tree/clawstudio-mono-dsp-clarity-v20' > clawstudio/README.md
+      - name: Overlay Poly rack panel from canonical source
+        run: |
+          git -C "$RUNNER_TEMP/afterglow" fetch --depth 1 origin 1582036167e7c49feea3e67607d2abe926d4ecea
+          for file in rack-devices.js rack-devices.css; do
+            git -C "$RUNNER_TEMP/afterglow" show "1582036167e7c49feea3e67607d2abe926d4ecea:web/dist/$file" > "clawstudio/$file"
+          done
       - name: Commit the self-contained static site
         run: |
           git config user.name 'github-actions[bot]'
