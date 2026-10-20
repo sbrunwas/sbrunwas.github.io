@@ -1,3 +1,4 @@
+import {clawPatchbay} from './poly-modular.js?v=rack-update-20261020';
 // SPDX-License-Identifier: AGPL-3.0-only
 // Original Buchla-inspired, not a port of vintage hardware firmware.
 export const BUCHLA_SOURCES=['MOD OSC','CYCLE','RANDOM','ENVELOPE','MOTION','S&H'];
@@ -14,46 +15,18 @@ export function patchModulation(routes=[],p={},voice={},time=0){
  return out;
 }
 export function attachBuchlaPanel(mount,routes,params){
- const board=document.createElement('section');board.className='buc-bay';
- const button=(type,x)=>'<button class="buc-jack" type="button" data-'+type+'="'+x+'"><span class="buc-socket"></span>'+x+'</button>';
- board.innerHTML='<header><div><strong>COMPLEX OSCILLATOR / SEMI-MODULAR BAY</strong><small>259 TIMBRE · 281 CYCLE · 266 UNCERTAINTY · 292 LOW-PASS GATE</small></div><button id="buc-randomize">⚄ REROUTE</button></header>'+
- '<div class="buc-knobs" id="buc-knobs"></div><p class="buc-help">Tap a SOURCE jack then a DESTINATION jack. Edit cable depth below; × unplugs. Six cables maximum.</p>'+
- '<div class="buc-board" id="buc-board"><div class="buc-jacks buc-sources">'+BUCHLA_SOURCES.map(x=>button('source',x)).join('')+'</div><svg id="buc-cables" aria-hidden="true"></svg><div class="buc-jacks buc-targets">'+BUCHLA_TARGETS.map(x=>button('target',x)).join('')+'</div></div><div id="buc-route-list" class="buc-routes"></div><div class="buc-status" aria-live="polite">Patch timbre, fold, filter, FM, and low-pass gate.</div>';
- mount.querySelector('.cri-sequencer').before(board);const $=s=>board.querySelector(s),all=s=>[...board.querySelectorAll(s)];
  const knobs=[['buchlaFold','FOLD'],['buchlaLpg','LPG'],['buchlaDecay','DECAY'],['buchlaRate','CYCLE RATE'],['buchlaIndex','MOD INDEX']];
- $('#buc-knobs').innerHTML=knobs.map(([k,n])=>'<label>'+n+'<input type="range" min="0" max="1" step=".01" data-buc-param="'+k+'"></label>').join('');
- all('[data-buc-param]').forEach(el=>{el.value=params[el.dataset.bucParam]??.5;el.oninput=()=>params[el.dataset.bucParam]=+el.value});
- let picked=null;const palette=['#f8d887','#8bd9d6','#dfa1e5','#f0a884','#8de5b2','#abc1f0'];
- function redraw(){
-  const host=$('#buc-board'),svg=$('#buc-cables'),r=host.getBoundingClientRect();if(!r.width||!r.height)return;
-  svg.setAttribute('viewBox','0 0 '+r.width+' '+r.height);svg.setAttribute('width',r.width);svg.setAttribute('height',r.height);svg.replaceChildren();
-  for(let i=0;i<routes.length;i++){const v=routes[i],a=all('[data-source]').find(e=>e.dataset.source===v.source),b=all('[data-target]').find(e=>e.dataset.target===v.target);if(!a||!b)continue;
-   const ra=a.querySelector('.buc-socket').getBoundingClientRect(),rb=b.querySelector('.buc-socket').getBoundingClientRect();
-   const x1=ra.left+ra.width/2-r.left,y1=ra.top+ra.height/2-r.top,x2=rb.left+rb.width/2-r.left,y2=rb.top+rb.height/2-r.top,mid=(x1+x2)/2,sag=10+i%3*17;
-   const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d','M '+x1+' '+y1+' C '+mid+' '+(y1+sag)+', '+mid+' '+(y2+sag)+', '+x2+' '+y2);
-   path.setAttribute('stroke',palette[i]);path.setAttribute('stroke-width',String(Math.max(2,Math.abs(v.amount)*4)));path.setAttribute('stroke-linecap','round');path.setAttribute('fill','none');svg.append(path);
-  }
- }
- function refresh(){
-  all('[data-buc-param]').forEach(el=>{el.value=params[el.dataset.bucParam]??.5});
-  const host=$('#buc-route-list');host.replaceChildren();routes.forEach((r,i)=>{const row=document.createElement('div');row.className='buc-route';
-   const label=document.createElement('span');label.textContent=(i+1)+'. '+r.source+' → '+r.target;
-   const slider=document.createElement('input');slider.type='range';slider.min=-1;slider.max=1;slider.step=.01;slider.value=r.amount;slider.setAttribute('aria-label','Patch cable '+(i+1)+' depth');
-   const value=document.createElement('small');value.textContent=Math.round(r.amount*100)+'%';
-   slider.oninput=()=>{r.amount=+slider.value;value.textContent=Math.round(r.amount*100)+'%';redraw()};
-   const remove=document.createElement('button');remove.type='button';remove.textContent='×';remove.title='Unplug cable';remove.onclick=()=>{routes.splice(i,1);refresh()};
-   row.append(label,slider,value,remove);host.append(row)
-  });requestAnimationFrame(redraw);
- }
- all('[data-source]').forEach(el=>el.onclick=()=>{picked=el.dataset.source;all('[data-source]').forEach(b=>b.classList.toggle('selected',b===el));$('.buc-status').textContent='Choose destination for '+picked});
- all('[data-target]').forEach(el=>el.onclick=()=>{if(!picked){$('.buc-status').textContent='Choose a source jack first';return}
-   const target=el.dataset.target,old=routes.find(r=>r.source===picked&&r.target===target);
-   if(old){old.amount=-old.amount;$('.buc-status').textContent='Inverted cable polarity'}
-   else if(routes.length<6){routes.push({source:picked,target,amount:.55});$('.buc-status').textContent=picked+' → '+target}
-   else $('.buc-status').textContent='Maximum six cables: unplug one first';
-   picked=null;all('[data-source]').forEach(b=>b.classList.remove('selected'));refresh();
+ let controls;
+ const panel=clawPatchbay.panel(mount.querySelector('.cri'),'texture',{
+  getRoutes:()=>routes.map(r=>({source:r.source,dest:r.target,depth:r.amount})),
+  setRoutes:next=>routes.splice(0,routes.length,...next.map(r=>({source:r.source,target:r.dest,amount:r.depth}))),
+  getRates:()=>({}),setRates:()=>{},
+  ideas:{'EVOLVING TIMBRE':BUCHLA_DEFAULT_ROUTES().map(r=>({source:r.source,dest:r.target,depth:r.amount})),
+   'METAL MOTION':[{source:'MOD OSC',dest:'FM',depth:.55},{source:'MOTION',dest:'PAN',depth:.65},{source:'ENVELOPE',dest:'FILTER',depth:.4}],
+   'RANDOM FOLDS':[{source:'S&H',dest:'FOLD',depth:.6},{source:'CYCLE',dest:'LPG',depth:.45}]},
+  controls:host=>{controls=host;host.innerHTML=knobs.map(([key,label])=>`<label>${label}<input aria-label="Texture ${label.toLowerCase()}" type="range" min="0" max="1" step=".01" data-texture-param="${key}"></label>`).join('');
+   host.querySelectorAll('input').forEach(el=>el.oninput=()=>{params[el.dataset.textureParam]=Number(el.value)})},
+  refreshControls:()=>controls?.querySelectorAll('input').forEach(el=>{el.value=params[el.dataset.textureParam]??.5})
  });
- $('#buc-randomize').onclick=()=>{routes.splice(0);const a=[...BUCHLA_SOURCES],b=[...BUCHLA_TARGETS];for(let i=0;i<3;i++){routes.push({source:a.splice(Math.random()*a.length|0,1)[0],target:b.splice(Math.random()*b.length|0,1)[0],amount:Math.random()*1.6-.8})}refresh()};
- const resize=typeof ResizeObserver!=='undefined'?new ResizeObserver(redraw):null;resize?.observe(board);refresh();
- return {refresh,dispose:()=>resize?.disconnect()};
+ return {refresh:panel.refresh,dispose:panel.destroy};
 }

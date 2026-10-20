@@ -1,8 +1,8 @@
 export const clawPatchbay=(()=>{
   const SOURCE_IDS=['LFO A','LFO B','ENV','VELOCITY','S&H','VOICE OSC','VOICE ENV'];
-  const SOURCE_BY_TYPE={mono:SOURCE_IDS.slice(0,5),poly:SOURCE_IDS};
-  const DEST_IDS={mono:['LP FREQ','HP FREQ','PITCH','RESONANCE','FM INDEX','LEVEL'],poly:['LP FREQ','PITCH','OSC2 PITCH','RESONANCE','LEVEL']};
-  const COLOR={'LFO A':'#5cd7ea','LFO B':'#b59df5','ENV':'#ffc969','VELOCITY':'#ff7c9a','S&H':'#f99e52','VOICE OSC':'#88e9ac','VOICE ENV':'#ff94cd'};
+  const SOURCE_BY_TYPE={mono:SOURCE_IDS.slice(0,5),poly:SOURCE_IDS,texture:['MOD OSC','CYCLE','RANDOM','ENVELOPE','MOTION','S&H']};
+  const DEST_IDS={mono:['LP FREQ','HP FREQ','PITCH','RESONANCE','FM INDEX','LEVEL'],poly:['LP FREQ','PITCH','OSC2 PITCH','RESONANCE','LEVEL'],texture:['TIMBRE','FOLD','LPG','FILTER','FM','PAN']};
+  const COLOR={'MOD OSC':'#5cd7ea','CYCLE':'#b59df5','RANDOM':'#ff7c9a','ENVELOPE':'#ffc969','MOTION':'#88e9ac','LFO A':'#5cd7ea','LFO B':'#b59df5','ENV':'#ffc969','VELOCITY':'#ff7c9a','S&H':'#f99e52','VOICE OSC':'#88e9ac','VOICE ENV':'#ff94cd'};
   const RATE_DEFAULTS={a:1.4,b:.29,hold:3.5};
   function routesSafe(list,type){
     if(!Array.isArray(list))return [];
@@ -87,11 +87,12 @@ export const clawPatchbay=(()=>{
       'GENERATIVE':[{source:'S&H',dest:'LP FREQ',depth:.55},{source:'VOICE OSC',dest:'PITCH',depth:.18},{source:'LFO B',dest:'RESONANCE',depth:.22}]}
   };
   function panel(mount,type,config){
-    const root=document.createElement('section');root.className='claw-patch';root.setAttribute('aria-label',`${type} semi-modular patchbay`);
-    root.innerHTML=`<div class="claw-patch-head"><div><b>PATCH FIELD / ${type.toUpperCase()}</b><small>DRAG A CABLE OR TAP TWO JACKS · UP TO 8</small></div><div class="claw-patch-actions"><button type="button" data-action="idea">⚄ HAPPY ACCIDENT</button><button type="button" data-action="clear">CLEAR</button></div></div>
-      <div class="claw-patch-workspace"><div class="claw-patch-jacks" data-kind="source">${SOURCE_BY_TYPE[type].map(s=>`<button type="button" class="claw-jack" data-source="${s}" aria-label="Connect from ${s}"><i style="--jack:${COLOR[s]}"></i>${s}</button>`).join('')}</div><svg class="claw-patch-cables" aria-hidden="true" preserveAspectRatio="none"></svg><div class="claw-patch-jacks" data-kind="dest">${DEST_IDS[type].map(d=>`<button type="button" class="claw-jack" data-dest="${d}" aria-label="Connect to ${d}">${d}<i style="--jack:#94e7bd"></i></button>`).join('')}</div></div>
-      <div class="claw-patch-foot"><span class="claw-patch-tip" role="status">Drag from a source to a destination (or tap two jacks). S&H is clocked stepped-random voltage; VOICE signals come from a previous Poly voice.</span><div class="claw-patch-rates"><label>LFO A RATE <input aria-label="LFO A rate in hertz" data-rate="a" type="range" min=".03" max="12" step=".01"></label><label>LFO B RATE <input aria-label="LFO B rate in hertz" data-rate="b" type="range" min=".03" max="12" step=".01"></label><label>S&H CLOCK <input aria-label="Sample and hold rate in hertz" data-rate="hold" type="range" min=".25" max="16" step=".25"></label></div></div><div class="claw-patch-list" aria-label="Cable depth controls"></div>`;
+    const root=document.createElement('section');root.className='claw-patch claw-patch-'+type;root.setAttribute('aria-label',`${type} semi-modular patchbay`);
+    root.innerHTML=`<div class="claw-patch-head"><div><b>PATCH BAY / ${type.toUpperCase()}</b><small>SEMI-MODULAR SIGNAL ROUTING · 8 CABLES</small></div><div class="claw-patch-actions"><button type="button" data-action="idea">⚄ HAPPY ACCIDENT</button><button type="button" data-action="clear">CLEAR</button></div></div>
+      <div class="claw-patch-labels"><span>MODULATION OUTPUTS</span><span>PARAMETER INPUTS</span></div><div class="claw-patch-workspace"><div class="claw-patch-jacks" data-kind="source">${SOURCE_BY_TYPE[type].map(s=>`<button type="button" class="claw-jack" data-source="${s}" aria-label="Connect from ${s}"><i style="--jack:${COLOR[s]}"></i>${s}</button>`).join('')}</div><svg class="claw-patch-cables" aria-hidden="true" preserveAspectRatio="none"></svg><div class="claw-patch-jacks" data-kind="dest">${DEST_IDS[type].map(d=>`<button type="button" class="claw-jack" data-dest="${d}" aria-label="Connect to ${d}">${d}<i style="--jack:#94e7bd"></i></button>`).join('')}</div></div>
+      <div class="claw-patch-foot"><span class="claw-patch-tip" role="status">${type==='texture'?'Patch the modulation outputs into timbre, fold, filter, FM, pan or the low-pass gate.':'Patch modulation outputs into voice parameters. VOICE signals come from a previous Poly voice.'} Drag a cable or tap two jacks.</span><div class="claw-patch-rates"><label>LFO A RATE <input aria-label="LFO A rate in hertz" data-rate="a" type="range" min=".03" max="12" step=".01"></label><label>LFO B RATE <input aria-label="LFO B rate in hertz" data-rate="b" type="range" min=".03" max="12" step=".01"></label><label>S&H CLOCK <input aria-label="Sample and hold rate in hertz" data-rate="hold" type="range" min=".25" max="16" step=".25"></label></div></div><div class="claw-patch-list" aria-label="Cable depth controls"></div>`;
     mount.insertAdjacentElement('afterend',root);
+    if(config.controls){root.querySelector('.claw-patch-rates').replaceChildren();config.controls(root.querySelector('.claw-patch-rates'))}
     let selected=null;const svg=root.querySelector('svg'),tip=root.querySelector('.claw-patch-tip'),list=root.querySelector('.claw-patch-list');
     const routes=()=>routesSafe(config.getRoutes(),type);
     function update(next){config.setRoutes(routesSafe(next,type));render()}
@@ -104,12 +105,13 @@ export const clawPatchbay=(()=>{
       list.replaceChildren();for(const r of rs){const line=document.createElement('div');line.className='claw-patch-line';
         const info=document.createElement('span');info.textContent=`${r.source} → ${r.dest}`;info.style.color=COLOR[r.source];
         const input=document.createElement('input');input.type='range';input.min='-1';input.max='1';input.step='.01';input.value=String(r.depth);input.setAttribute('aria-label',`Depth ${r.source} to ${r.dest}`);
-        const pct=document.createElement('small');pct.textContent=`${Math.round(r.depth*100)}%`;input.addEventListener('input',()=>{pct.textContent=Math.round(Number(input.value)*100)+'%';config.setRoutes(rs.map(x=>x.source===r.source&&x.dest===r.dest?{...x,depth:Number(input.value)}:x))});
+        const pct=document.createElement('small');pct.textContent=`${Math.round(r.depth*100)}%`;input.addEventListener('input',()=>{pct.textContent=Math.round(Number(input.value)*100)+'%';config.setRoutes(routes().map(x=>x.source===r.source&&x.dest===r.dest?{...x,depth:Number(input.value)}:x));redraw()});
         const remove=document.createElement('button');remove.type='button';remove.textContent='×';remove.setAttribute('aria-label',`Disconnect ${r.source} from ${r.dest}`);remove.onclick=()=>update(routes().filter(x=>!(x.source===r.source&&x.dest===r.dest)));
         line.append(info,input,pct,remove);list.append(line);
       }
-      if(!rs.length)list.textContent='No cables yet — your original synth sound is unchanged.';
-      root.querySelectorAll('[data-rate]').forEach(el=>el.value=String(ratesSafe(config.getRates())[el.dataset.rate]));
+      root.querySelectorAll('[data-source],[data-dest]').forEach(btn=>{const used=rs.some(r=>r.source===btn.dataset.source||r.dest===btn.dataset.dest);btn.classList.toggle('connected',used)});
+      if(!rs.length)list.textContent='No patch cables connected.';
+      root.querySelectorAll('[data-rate]').forEach(el=>el.value=String(ratesSafe(config.getRates())[el.dataset.rate]));config.refreshControls?.();
       requestAnimationFrame(redraw);
     }
     const workspace=root.querySelector('.claw-patch-workspace');let drag=null,suppressSourceClick=false;
@@ -146,7 +148,7 @@ export const clawPatchbay=(()=>{
       if(source){selected=source.dataset.source;tip.textContent=`${selected} selected — now pick any destination.`;render();return}
       if(dest){if(!selected){tip.textContent='Pick a source jack first.';return}const d=dest.dataset.dest,r=routes(),existing=r.find(x=>x.source===selected&&x.dest===d);if(!existing&&r.length>=8){tip.textContent='Eight cables maximum; remove one first.';return}if(!existing)attach(selected,d);selected=null;render();return}
       const action=event.target.closest('[data-action]')?.dataset.action;if(action==='clear'){selected=null;update([]);tip.textContent='All cables unplugged.'}
-      if(action==='idea'){const names=Object.keys(IDEAS[type]),name=names[Math.floor(Math.random()*names.length)];selected=null;update(IDEAS[type][name]);tip.textContent=`${name} · reroute or invert any cable to experiment.`}
+      if(action==='idea'){const ideas=config.ideas||IDEAS[type],names=Object.keys(ideas),name=names[Math.floor(Math.random()*names.length)];selected=null;update(ideas[name]);tip.textContent=`${name} · reroute or invert any cable to experiment.`}
     });
     root.querySelectorAll('[data-rate]').forEach(el=>el.addEventListener('input',()=>config.setRates({...config.getRates(),[el.dataset.rate]:Number(el.value)})));
     let observer=null;if(typeof ResizeObserver!=='undefined'){observer=new ResizeObserver(redraw);observer.observe(root)}
