@@ -39,7 +39,7 @@ jobs:
           done
           mkdir -p clawstudio/bass01
           cp "$RUNNER_TEMP/afterglow/web/dist/bass01/index.html" clawstudio/bass01/index.html
-          for file in afterglow.wasm audio.js state.js worklet.js wasm-runtime.js render-worker.js clawstudio-capture.worklet.js; do
+          for file in afterglow.wasm audio.js state.js worklet.js wasm-runtime.js render-worker.js clawstudio-capture.worklet.js clawstudio-clock.worker.js; do
             cp "$RUNNER_TEMP/afterglow/web/dist/$file" "clawstudio/$file"
           done
           cp "$RUNNER_TEMP/afterglow/web/dist/ENGINE-NOTES.md" clawstudio/ENGINE-NOTES.md
