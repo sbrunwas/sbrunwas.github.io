@@ -1,15 +1,16 @@
 import {attachStepSequencer,eventsForStep,normalizeBank,LENGTHS} from './step-sequencer.js?v=shared-seq-20261021';
+import {POLY_WAVEFORMS,POLY_VOICE_DEFAULTS,normalizePolyVoice,polyFmRatio,createPolyOscillator} from './poly-voice.js?v=poly-voice-20261021';
 import {coarseCents,attachCoarsePitch} from './coarse-pitch.js?v=slow-coarse-20261020';
 // ClawStudio original browser rack prototypes — not vendor ROM emulations.
 // Three playable instrument modules share the host AudioContext, transport and routing.
 import {newPolyArp,arpEventsAtStep} from './poly-arp.js';
 import {attachPolyArp} from './poly-arp-ui.js';
-import {clawPatchbay} from './poly-modular.js?v=slow-coarse-20261020';
+import {clawPatchbay} from './poly-modular.js?v=poly-voice-20261021';
 import {textureCycleRate,buchlaParamDefaults,BUCHLA_DEFAULT_ROUTES,attachBuchlaPanel,patchModulation} from './texture-patch.js?v=slow-coarse-20261020';
 const TAU=2*Math.PI, cap=(n,a=0,b=1)=>Math.max(a,Math.min(b,n)), hz=n=>440*Math.pow(2,(n-69)/12);
 const midiName=n=>['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][((n%12)+12)%12]+(Math.floor(n/12)-1);
 const ease=(v,min,max)=>min*Math.pow(max/min,cap(v));
-const basePoly={coarse1:0,coarse2:0,wave:'SUPER SAW',osc2:'SAW',detune:.4,mix:.78,shape:.3,tune:.5,sync:0,cutoff:.68,res:.28,env:.42,attack:.04,decay:.37,sustain:.65,release:.37,chorus:.65,delay:.22,drive:.12,motion:.12,modRate:.24,level:.57,arp:'UP',steps:8};
+const basePoly={...POLY_VOICE_DEFAULTS,coarse1:0,coarse2:0,wave:'SUPER SAW',osc2:'SAW',detune:.4,mix:.78,shape:.3,tune:.5,sync:0,cutoff:.68,res:.28,env:.42,attack:.04,decay:.37,sustain:.65,release:.37,chorus:.65,delay:.22,drive:.12,motion:.12,modRate:.24,level:.57,arp:'UP',steps:8};
 const baseTexture={coarse1:0,coarse2:0,coarse3:0,engine:'WAVETABLE',table:'GLASS',wave:.32,spread:.45,second:.48,third:.24,fm:.07,ring:.04,cutoff:.58,res:.22,filter2:.29,attack:.46,decay:.65,sustain:.82,release:.77,rate:.22,depth:.61,motion:.7,evolve:.45,space:.78,feedback:.21,level:.58,mutation:.22,filterMode:'SERIAL',filterA:'LOWPASS',filterB:'HIGHPASS',filterEnv:.22,envAttack:.26,envDecay:.7,character:.45,pace:'DRONE',arp:'DRIFT',steps:16,...buchlaParamDefaults};
 const baseAcid={coarse1:0,wave:'SAW',cutoff:.43,res:.62,env:.64,decay:.36,accent:.58,slide:.37,drive:.28,tone:.4,volume:.65,steps:16,arp:'LINE'};
 export const INSTRUMENT_PRESETS={
@@ -135,17 +136,19 @@ function createEnsemble(ctx,input,dest){
 }
 class PolyEngine{
  constructor(ctx,dest,params){this.ctx=ctx;this.p=params;this.fx=makeFX(ctx,dest,.09);this.ensemble=createEnsemble(ctx,this.fx.input,dest);this.voices=[];this.patchRoutes=[];this.patchRates=clawPatchbay.ratesSafe();this.modulators=clawPatchbay.makeAudio(ctx,'poly',{}, {rates:this.patchRates},{sharedClock:true});this.update()}
+ oscillatorSettings(f,second=false){const p=this.p;return second?
+  {frequency:f*2**((p.tune2-.5)*.3)*polyFmRatio(p.fmRatio),coarse:coarseCents(p.coarse2),kind:p.osc2,detune:p.detune2,mix:p.mix2,shape:p.shape2}:
+  {frequency:f*2**((p.tune-.5)*.2),coarse:coarseCents(p.coarse1),kind:p.wave,detune:p.detune,mix:p.mix,shape:p.shape};
+ }
  update(){const p=this.p,t=this.ctx.currentTime;this.fx.wet.gain.setTargetAtTime(p.chorus*.055,t,.05);this.ensemble.wet.gain.setTargetAtTime(p.chorus*.46,t,.04);this.ensemble.leftLfo.frequency.setTargetAtTime(.16+p.modRate*.8,t,.08);this.ensemble.rightLfo.frequency.setTargetAtTime(.22+p.modRate*.94,t,.08);this.ensemble.leftDepth.gain.setTargetAtTime(.001+p.motion*.007,t,.08);this.ensemble.rightDepth.gain.setTargetAtTime(.001+p.motion*.009,t,.08);this.fx.delayWet.gain.setTargetAtTime(p.delay*.36,t,.05);this.fx.feed.gain.setTargetAtTime(.16+p.delay*.45,t,.05);
  for(const v of this.voices){if(v.end<=t)continue;const now=Math.max(t,v.start);
   v.cut.frequency.setTargetAtTime(ease(p.cutoff,100,18000),now,.025);v.cut.Q.setTargetAtTime(.65+p.res*14,now,.025);
   v.out.gain.setTargetAtTime(p.level*.5,now,.025);v.filterEnvGain.gain.setTargetAtTime(p.env*1800,now,.025);
-  const mix=superSawMix(p.mix),detune=superSawDetune(p.detune);
-  v.osc.forEach((o,i)=>{const nominal=v.hz*Math.pow(2,(p.tune-.5)*.2);o.frequency.setTargetAtTime(v.kind==='SUPER SAW'?nominal*(1+SUPER_SAW_OFFSETS[i]*detune):nominal,now,.025);
-   o.detune.setTargetAtTime(coarseCents(p.coarse1)+(v.kind==='SUPER SAW'?0:i===0?0:((i%2?-1:1)*Math.ceil(i/2)*3.7*p.detune*3.4)),now,.025);
-   v.layers[i].gain.setTargetAtTime(v.kind==='SUPER SAW'?(i===3?mix.center:mix.side)*1.04:i===0?1:(p.mix/(v.osc.length-1))*1.25,now,.025);
-   if(v.kind==='SHAPE'||v.kind==='FORMANT')o.setPeriodicWave(wave(this.ctx,v.kind==='SHAPE'?'ORGANIC':'VOCAL',p.shape));
-  });
-  v.second.frequency.setTargetAtTime(v.hz*2**((p.shape-.5)*.3),now,.025);v.second.detune.setTargetAtTime(coarseCents(p.coarse2),now,.025);
+  const first=this.oscillatorSettings(v.hz),second=this.oscillatorSettings(v.hz,true);
+  v.oscillator1.update(first,now);v.oscillator2.update(second,now);
+  v.osc2Gain.gain.setTargetAtTime(p.osc2Gain,now,.025);
+  v.crossFM.gain.setTargetAtTime(first.frequency*4*p.fmAmount,now,.025);
+  v.kind=p.wave;
  }
  }
  setPatch(routes,rates){
@@ -154,55 +157,45 @@ class PolyEngine{
    for(const v of this.voices){v.cv?.setRoutes(this.patchRoutes);v.cv?.setRates(this.patchRates)}
  }
  setPatchRates(rates){this.patchRates=clawPatchbay.ratesSafe(rates);this.modulators.setRates(this.patchRates);for(const v of this.voices)v.cv?.setRates(this.patchRates)}
- note(midi,t,dur,velocity=1){const p=this.p,ctx=this.ctx,f=hz(midi),attack=p.attack,release=p.release;
-// Eight-voice polyphony cap with gentle voice stealing.
- this.voices=this.voices.filter(v=>{if(v.end>ctx.currentTime)return true;v.cv?.dispose();v.filterEnvelope?.disconnect();return false});
- if(this.voices.length>=8){const oldest=this.voices.shift();oldest.cv?.dispose();oldest.amp.gain.cancelScheduledValues(t);oldest.amp.gain.setTargetAtTime(.0001,t,.007);}
- const cut=ctx.createBiquadFilter();cut.type='lowpass';cut.frequency.setValueAtTime(ease(p.cutoff,110,18500),t);cut.Q.value=.65+p.res*14;
+ note(midi,t,dur,velocity=1){const p=this.p,ctx=this.ctx,f=hz(midi);
+ // Eight-voice polyphony cap with gentle voice stealing and bounded oscillator lifetimes.
+ this.voices=this.voices.filter(v=>{if(v.end>ctx.currentTime)return true;v.dispose();return false});
+ if(this.voices.length>=8){const oldest=this.voices.shift();oldest.amp.gain.cancelScheduledValues(t);oldest.amp.gain.setTargetAtTime(.0001,t,.007);oldest.dispose(t+.06)}
+ const cut=ctx.createBiquadFilter();cut.type='lowpass';cut.frequency.setValueAtTime(ease(p.cutoff,100,18000),t);cut.Q.value=.65+p.res*14;
  const out=ctx.createGain();out.gain.value=p.level*.5;const pan=ctx.createStereoPanner();pan.pan.value=0;const amp=ctx.createGain();amp.gain.value=.0001;cut.connect(amp);amp.connect(out);out.connect(pan);pan.connect(this.fx.input);
-cut.frequency.setValueAtTime(ease(p.cutoff,100,18000),t);
-const end=stage(amp.gain,t,attack,p.decay,p.sustain,release,dur,.36*Math.max(.1,Math.min(1,velocity)));
-const filterEnvelope=ctx.createConstantSource(),filterEnvGain=ctx.createGain();filterEnvGain.gain.value=p.env*1800;
-filterEnvelope.offset.setValueAtTime(1,t);filterEnvelope.offset.setTargetAtTime(0,t+.008,Math.max(.02,p.decay*.5));filterEnvelope.connect(filterEnvGain);filterEnvGain.connect(cut.detune);filterEnvelope.start(t);filterEnvelope.stop(end+.08);
-const oscs=[],layerGains=[];let src=ctx.createGain();src.connect(cut);
-const layers=p.wave==='SUPER SAW'?7:p.wave==='SHAPE'||p.wave==='FORMANT'?3:2;
- const detuneCurve=superSawDetune(p.detune),mixGains=superSawMix(p.mix);
-for(let i=0;i<layers;i++){
- const o=ctx.createOscillator(),g=ctx.createGain();let det=i===0?0:((i%2?-1:1)*(Math.ceil(i/2)*3.7)*p.detune*3.4);let wf=p.wave==='PWM'?'square':'sawtooth';if(p.wave==='FM'||p.wave==='FORMANT')wf='sine';if(p.wave==='SHAPE')wf='triangle';if(p.wave==='FEEDBACK')wf='sawtooth';if(p.wave==='SYNC')wf='sawtooth';o.type=wf;const nominal=f*Math.pow(2,(p.tune-.5)*.2);
- if(p.wave==='SUPER SAW'){
-   o.frequency.setValueAtTime(nominal*(1+SUPER_SAW_OFFSETS[i]*detuneCurve),t);
-   g.gain.value=(i===3?mixGains.center:mixGains.side)*1.04;
- }else{
-   o.frequency.setValueAtTime(nominal,t);o.detune.value=det;
-   g.gain.value=i===0?1:((p.mix||.5)/(layers-1))*1.25;
- }
- o.detune.value+=coarseCents(p.coarse1);
- if(p.wave==='FORMANT'){const pw=wave(ctx,'VOCAL',p.shape);o.setPeriodicWave(pw)}
- if(p.wave==='SHAPE'){const pw=wave(ctx,'ORGANIC',p.shape);o.setPeriodicWave(pw)}
- if(p.wave==='FM'){const mod=ctx.createOscillator(),mg=ctx.createGain();mod.frequency.value=f*2;mg.gain.value=f*p.shape*2;mod.connect(mg);mg.connect(o.frequency);mod.start(t);mod.stop(end+.02)}
- if(p.wave==='SYNC')o.frequency.setTargetAtTime(f*(1+p.shape*1.2),t+.012,.1);
- if(p.wave==='FEEDBACK'){const ws=ctx.createWaveShaper();const curve=new Float32Array(256);for(let k=0;k<curve.length;k++){const v=k/127.5-1;curve[k]=Math.tanh(v*(1+p.shape*24))}ws.curve=curve;o.connect(g);g.connect(ws);ws.connect(src)}else{o.connect(g);g.connect(src)}
- // Starting ahead of the gate decorrelates saw phases across notes without a custom oscillator.
- const phaseHeadroom=1/Math.max(1,o.frequency.value);
- o.start(Math.max(ctx.currentTime,t-Math.random()*phaseHeadroom));o.stop(end+.04);oscs.push(o);layerGains.push(g)}
- const second=oscillator(ctx,p.osc2==='PULSE'?'square':p.osc2==='TRI'?'triangle':'sawtooth',f*2**((p.shape-.5)*.3),t,end+.04,.22,src);
- second.detune.value=coarseCents(p.coarse2);
+ const end=stage(amp.gain,t,p.attack,p.decay,p.sustain,p.release,dur,.36*Math.max(.1,Math.min(1,velocity)));
+ const filterEnvelope=ctx.createConstantSource(),filterEnvGain=ctx.createGain();filterEnvGain.gain.value=p.env*1800;
+ stage(filterEnvelope.offset,t,p.filterAttack,p.filterDecay,p.filterSustain,p.filterRelease,dur,1);
+ filterEnvelope.connect(filterEnvGain);filterEnvGain.connect(cut.detune);filterEnvelope.start(t);filterEnvelope.stop(end+.08);
+ const helpers={superSawDetune,superSawMix,offsets:SUPER_SAW_OFFSETS,wave};
+ const first=this.oscillatorSettings(f),secondSettings=this.oscillatorSettings(f,true);
+ const oscillator1=createPolyOscillator(ctx,{...first,start:t,end:end+.04},helpers);
+ const oscillator2=createPolyOscillator(ctx,{...secondSettings,start:t,end:end+.04},helpers);
+ const oscs=oscillator1.oscillators,second=oscillator2.oscillators[0],osc2Gain=ctx.createGain(),crossFM=ctx.createGain();
+ oscillator1.output.connect(cut);osc2Gain.gain.value=p.osc2Gain;oscillator2.output.connect(osc2Gain);osc2Gain.connect(cut);
+ // The FM tap precedes OSC 2 gain, so a silent modulator still changes OSC 1.
+ crossFM.gain.value=first.frequency*4*p.fmAmount;oscillator2.output.connect(crossFM);for(const osc of oscs)crossFM.connect(osc.frequency);
+ second.levelNode=osc2Gain;
  const previous=this.voices.slice().reverse().find(v=>v.end>t&&v.osc?.length);
+ const osc2Detunes=oscillator2.oscillators.map(o=>o.detune);
  const cv=clawPatchbay.makeAudio(ctx,'poly',{
-    'LP FREQ':cut.detune,'PITCH':oscs.map(o=>o.detune).concat([second.detune]),
-    'OSC2 PITCH':second.detune,'RESONANCE':cut.Q,'LEVEL':out.gain,
+    'LP FREQ':cut.detune,'PITCH':oscs.map(o=>o.detune).concat(osc2Detunes),
+    'OSC2 PITCH':osc2Detunes,'RESONANCE':cut.Q,'LEVEL':out.gain,
     'DETUNE':oscs.map((o,i)=>({param:o.detune,scale:(i%2?-1:1)*70})),
-    'OSC MIX':layerGains.slice(1).map(g=>({param:g.gain,scale:.15})),
-    'OSC2 LEVEL':{param:second.levelNode.gain,scale:.2},'FILTER ENV':{param:filterEnvGain.gain,scale:1600},'PAN':{param:pan.pan,scale:.8}
+    'OSC MIX':oscillator1.layers.slice(1).map(g=>({param:g.gain,scale:.15})),
+    'OSC2 LEVEL':{param:osc2Gain.gain,scale:.2},'FM INDEX':{param:crossFM.gain,scale:first.frequency*4},
+    'FILTER ENV':{param:filterEnvGain.gain,scale:1600},'PAN':{param:pan.pan,scale:.8}
  },{routes:this.patchRoutes,rates:this.patchRates},{startAt:t,stopAt:end+.08,
     sharedSources:this.modulators.getSources(),scales:{'LP FREQ':2400},
     seed:(midi*2654435761+Math.round(t*ctx.sampleRate))>>>0,
     previousVoice:previous?{oscillator:previous.osc[0],envelope:previous.cv?.getSource('ENV')}:null});
  cv.noteOn(t,dur,{attack:.003+p.attack*p.attack*1.8,decay:.025+p.decay*p.decay*2,
    sustain:p.sustain,release:.035+p.release*p.release*4,velocity});
- this.voices.push({end,start:t,amp,osc:oscs,cv,cut,out,pan,hz:f,kind:p.wave,layers:layerGains,second,filterEnvelope,filterEnvGain});}
- releaseVoices(){const t=this.ctx.currentTime;for(const v of this.voices){v.amp.gain.cancelScheduledValues(t);v.amp.gain.setTargetAtTime(.0001,t,.015);v.cv?.noteOff(t)}}
- dispose(){this.modulators.dispose();for(const v of this.voices){v.cv?.dispose();v.filterEnvelope?.disconnect()}this.voices=[];this.ensemble.dispose();this.fx.input.disconnect();this.fx.wet.disconnect();this.fx.delayWet.disconnect()}
+ const dispose=(time=ctx.currentTime)=>{cv.dispose();oscillator1.dispose(time);oscillator2.dispose(time);try{filterEnvelope.stop(time)}catch{}if(time<=ctx.currentTime){filterEnvelope.disconnect();filterEnvGain.disconnect();crossFM.disconnect();osc2Gain.disconnect();cut.disconnect();amp.disconnect();out.disconnect();pan.disconnect()}};
+ this.voices.push({end,start:t,amp,osc:oscs,cv,cut,out,pan,hz:f,kind:p.wave,layers:oscillator1.layers,second,oscillator1,oscillator2,osc2Gain,crossFM,filterEnvelope,filterEnvGain,dispose});
+ }
+ releaseVoices(){const t=this.ctx.currentTime;for(const v of this.voices){v.amp.gain.cancelScheduledValues(t);v.amp.gain.setTargetAtTime(.0001,t,.015);v.cv?.noteOff(t);if(v.filterEnvelope.offset.cancelAndHoldAtTime)v.filterEnvelope.offset.cancelAndHoldAtTime(t);else v.filterEnvelope.offset.cancelScheduledValues(t);v.filterEnvelope.offset.setTargetAtTime(.0001,t,Math.max(.012,(.035+this.p.filterRelease**2*4)/3))}}
+ dispose(){this.modulators.dispose();for(const v of this.voices)v.dispose();this.voices=[];this.ensemble.dispose();this.fx.input.disconnect();this.fx.wet.disconnect();this.fx.delayWet.disconnect()}
 }
 // Six complementary engines deliberately use DIFFERENT synthesis paths.
 // Unlike firmware emulation, these are original WebAudio algorithms inspired by
@@ -341,20 +334,22 @@ INSTRUMENT_PRESETS.texture.push(
  ['BUCHLA / Singing Circuit',{engine:'FORMANT',pace:'DRONE',character:.75,ring:.67,attack:.51,sustain:.72,release:.9,buchlaFold:.31,buchlaLpg:.34,buchlaRate:.31,buchlaIndex:.58,space:.8}],
  ['BUCHLA / Broken Clock',{engine:'RING',pace:'PLUCK',wave:.55,ring:.9,attack:.01,decay:.23,sustain:.09,release:.24,buchlaFold:.81,buchlaLpg:.89,buchlaDecay:.19,buchlaRate:.79,buchlaIndex:.88,space:.35}]
 );
-const CONFIG={poly:{name:'POLY-01',subtitle:'VIRTUAL ANALOG · PERFORMANCE SYNTHESIZER',color:'#709bd4',panel:['OSCILLATOR 1','OSCILLATOR 2 + SHAPE','FILTER · JP-STYLE SLIDERS','ENVELOPES','ENSEMBLE / FX'],preset:basePoly,keys:['detune','mix','shape','tune','sync','cutoff','res','env','attack','decay','sustain','release','chorus','delay','drive','motion','modRate','level'],selects:{wave:['SUPER SAW','SAW','PWM','FEEDBACK','SYNC','SHAPE','FM','FORMANT'],osc2:['SAW','PULSE','TRI'],arp:['UP','DOWN','CHORD','OFF']}},texture:{name:'TEXTURE-01',subtitle:'MICRO Q WAVETABLE · ABSYNTH-STYLE MULTI ENGINE + MUTATION',color:'#e2c73c',preset:baseTexture,keys:['wave','spread','second','third','fm','ring','cutoff','res','filter2','filterEnv','envAttack','envDecay','character','attack','decay','sustain','release','rate','depth','motion','evolve','space','feedback','level','mutation'],selects:{engine:['WAVETABLE','FM MATRIX','WAVEFOLD','RESONATOR','NOISE','FORMANT','RING'],table:['GLASS','HOLLOW','VOCAL','ORGANIC','AIR','METAL'],filterMode:['SERIAL','PARALLEL','SPLIT'],filterA:['LOWPASS','HIGHPASS','BANDPASS','NOTCH'],filterB:['LOWPASS','HIGHPASS','BANDPASS','NOTCH'],pace:['DRONE','PULSE','PLUCK','SWARM'],arp:['DRIFT','CHORD','UP','OFF']}},acid:{name:'ACID-01',subtitle:'303 BASS LINE · ACCENT / SLIDE · STEP PROGRAMMER',color:'#d7d3c6',preset:baseAcid,keys:['cutoff','res','env','decay','accent','slide','drive','tone','volume'],selects:{wave:['SAW','SQUARE']}}};
+const CONFIG={poly:{name:'POLY-01',subtitle:'VIRTUAL ANALOG · PERFORMANCE SYNTHESIZER',color:'#709bd4',panel:['OSCILLATOR 1','OSCILLATOR 2 + SHAPE','FILTER · JP-STYLE SLIDERS','ENVELOPES','ENSEMBLE / FX'],preset:basePoly,keys:['detune','mix','shape','tune','sync','detune2','mix2','shape2','tune2','osc2Gain','fmAmount','fmRatio','filterAttack','filterDecay','filterSustain','filterRelease','cutoff','res','env','attack','decay','sustain','release','chorus','delay','drive','motion','modRate','level'],selects:{wave:POLY_WAVEFORMS,osc2:POLY_WAVEFORMS,arp:['UP','DOWN','CHORD','OFF']}},texture:{name:'TEXTURE-01',subtitle:'MICRO Q WAVETABLE · ABSYNTH-STYLE MULTI ENGINE + MUTATION',color:'#e2c73c',preset:baseTexture,keys:['wave','spread','second','third','fm','ring','cutoff','res','filter2','filterEnv','envAttack','envDecay','character','attack','decay','sustain','release','rate','depth','motion','evolve','space','feedback','level','mutation'],selects:{engine:['WAVETABLE','FM MATRIX','WAVEFOLD','RESONATOR','NOISE','FORMANT','RING'],table:['GLASS','HOLLOW','VOCAL','ORGANIC','AIR','METAL'],filterMode:['SERIAL','PARALLEL','SPLIT'],filterA:['LOWPASS','HIGHPASS','BANDPASS','NOTCH'],filterB:['LOWPASS','HIGHPASS','BANDPASS','NOTCH'],pace:['DRONE','PULSE','PLUCK','SWARM'],arp:['DRIFT','CHORD','UP','OFF']}},acid:{name:'ACID-01',subtitle:'303 BASS LINE · ACCENT / SLIDE · STEP PROGRAMMER',color:'#d7d3c6',preset:baseAcid,keys:['cutoff','res','env','decay','accent','slide','drive','tone','volume'],selects:{wave:['SAW','SQUARE']}}};
 function makeKnob(key,v,color){return `<div class="cri-knobcell"><span>${key.toUpperCase()}</span><div tabindex="0" role="slider" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(v*100)}" aria-label="${key}" data-knob="${key}" class="cri-knob" style="--paint:${color};--rot:${-135+v*270}deg;--v:${v}"><i></i></div><small data-val="${key}">${Math.round(v*100)}</small></div>`}
-// Poly's panel is a view of the existing parameters; patch and DSP formats stay stable.
+// Poly uses matching oscillator panels and separate amplifier and filter contours.
 function makePolyPanel(cfg,p){
- const labels={mix:'SAW MIX',shape:'SHAPE',tune:'FINE TUNE',sync:'SYNC',res:'RESONANCE',env:'ENV DEPTH',modRate:'RATE',motion:'DEPTH',level:'LEVEL'};
- const knob=k=>makeKnob(k,p[k],cfg.color).replace(`<span>${k.toUpperCase()}</span>`,`<span>${labels[k]||k.toUpperCase()}</span>`);
+ const labels={detune2:'DETUNE',mix2:'SAW MIX',shape2:'SHAPE',tune2:'FINE TUNE',osc2Gain:'GAIN',fmAmount:'FM AMOUNT',fmRatio:'OSC 2 RATIO',filterAttack:'ATTACK',filterDecay:'DECAY',filterSustain:'SUSTAIN',filterRelease:'RELEASE',mix:'SAW MIX',shape:'SHAPE',tune:'FINE TUNE',sync:'SYNC',res:'RESONANCE',env:'ENV DEPTH',modRate:'RATE',motion:'DEPTH',level:'LEVEL'};
+ const knob=k=>makeKnob(k,p[k],cfg.color).replace(`<span>${k.toUpperCase()}</span>`,`<span>${labels[k]||k.toUpperCase()}</span>`).replace(`aria-label="${k}"`,`aria-label="${labels[k]||k}"`);
  const picker=(k,label)=>`<label class="cri-picker">${label}<select data-opt="${k}">${cfg.selects[k].map(v=>`<option value="${v}">${v}</option>`).join('')}</select></label>`;
  const faders=keys=>`<div class="jp-faders">${keys.map(k=>`<label class="jp-fader"><span>${labels[k]||k.toUpperCase()}</span><span class="jp-fader-track"><input aria-label="${k} performance slider" data-fader="${k}" type="range" min="0" max="1" step=".005" value="${p[k]}"></span><output data-val="${k}">${Math.round(p[k]*100)}</output></label>`).join('')}</div>`;
  const group=(cls,title,sub,body)=>`<section class="jp-section ${cls}" aria-label="${title}"><h3>${title}</h3><p>${sub}</p>${body}</section>`;
  return `<div class="jp-panel">
- ${group('jp-osc1','OSCILLATOR 1','SUPER SAW / WAVE ENGINE',picker('wave','WAVEFORM')+`<div class="jp-knobs">${['detune','mix','shape'].map(knob).join('')}</div>`)}
- ${group('jp-osc2','OSCILLATOR 2','PITCH / SYNC',picker('osc2','WAVEFORM')+`<div class="jp-knobs">${['tune','sync'].map(knob).join('')}</div>`)}
+ ${group('jp-osc1','OSCILLATOR 1','SUPER SAW / WAVE ENGINE',picker('wave','WAVEFORM')+`<div class="jp-knobs">${['detune','mix','shape','tune'].map(knob).join('')}</div>`)}
+ ${group('jp-osc2','OSCILLATOR 2','FULL WAVE ENGINE / GAIN',picker('osc2','WAVEFORM')+`<div class="jp-knobs">${['detune2','mix2','shape2','tune2'].map(knob).join('')}</div><div class="jp-osc2-level"><div class="jp-coarse-host"></div><div class="jp-knobs">${knob('osc2Gain')}</div></div>`)}
  ${group('jp-filter','FILTER','LOW PASS / ENVELOPE',faders(['cutoff','res','env']))}
  ${group('jp-envelope','AMP ENVELOPE','ATTACK / DECAY / SUSTAIN / RELEASE',faders(['attack','decay','sustain','release']))}
+ ${group('jp-filter-envelope','FILTER ENVELOPE','ATTACK / DECAY / SUSTAIN / RELEASE',faders(['filterAttack','filterDecay','filterSustain','filterRelease']))}
+ ${group('jp-fm','CROSS MODULATION','OSC 2 → OSC 1 · RATIO TUNES OSC 2',`<div class="jp-knobs">${['fmAmount','fmRatio'].map(knob).join('')}</div>`)}
  ${group('jp-motion','MODULATION','ENSEMBLE MOTION',`<div class="jp-knobs">${['modRate','motion'].map(knob).join('')}</div>`)}
  ${group('jp-effects','EFFECTS','ENSEMBLE / DELAY / DRIVE',`<div class="jp-knobs">${['chorus','delay','drive'].map(knob).join('')}</div>`)}
  ${group('jp-performance','PERFORMANCE','VOICE / OUTPUT','<p>NOTES & CHORDS IN STEP SEQUENCER</p>'+`<div class="jp-knobs">${knob('level')}</div>`)}
@@ -374,7 +369,7 @@ export function createRackInstrument(mount,type,{externalClock=false,tempo=()=>1
  const coarseChanged=()=>{engine?.update?.();currentPreset='USER EDIT';$('#cri-patchname').textContent=currentPreset;syncUI()};
  if(type==='poly'){
   coarsePanels.push(attachCoarsePitch($('.jp-osc1'),p,[{key:'coarse1',label:'OSC 1'}],coarseChanged));
-  coarsePanels.push(attachCoarsePitch($('.jp-osc2'),p,[{key:'coarse2',label:'OSC 2'}],coarseChanged));
+  coarsePanels.push(attachCoarsePitch($('.jp-osc2 .jp-coarse-host'),p,[{key:'coarse2',label:'OSC 2'}],coarseChanged));
  }else{
   const controls=type==='acid'?[{key:'coarse1',label:'OSCILLATOR'}]:[
    {key:'coarse1',label:q=>q.engine==='NOISE'?'TONAL OSC':'OSC 1 / CARRIER'},
@@ -404,7 +399,7 @@ export function createRackInstrument(mount,type,{externalClock=false,tempo=()=>1
  const buchlaPanel=type==='texture'?attachBuchlaPanel(mount,persistentPatch,p,()=>{engine?.syncPatch();engine?.update()}):null;
  const sequence=attachStepSequencer($('.cri-sequencer'),state,{type,prefix:'cri',onSelect:i=>selected=i,onChange:()=>{polyArpPanel?.refresh()}});
  if(polyArpPanel)$('#poly-arp-on').addEventListener('click',()=>sequence.refresh());
- const val=k=>p[k],syncUI=()=>{$$('[data-knob]').forEach(el=>{let v=cap(p[el.dataset.knob]);el.style.setProperty('--rot',(-135+v*270)+'deg');el.style.setProperty('--v',v);el.setAttribute('aria-valuenow',Math.round(v*100));mount.querySelector(`[data-val="${el.dataset.knob}"]`).textContent=Math.round(v*100)});$$('[data-opt]').forEach(el=>el.value=p[el.dataset.opt]);$$('[data-fader]').forEach(el=>{el.value=p[el.dataset.fader];const output=mount.querySelector(`[data-val="${el.dataset.fader}"]`);if(output)output.textContent=Math.round(p[el.dataset.fader]*100)});sequence.refresh();drawWave();polyArpPanel?.refresh();buchlaPanel?.refresh();coarsePanels.forEach(panel=>panel.refresh())};
+ const val=k=>p[k],syncUI=()=>{$$('[data-knob]').forEach(el=>{let v=cap(p[el.dataset.knob]);el.style.setProperty('--rot',(-135+v*270)+'deg');el.style.setProperty('--v',v);el.setAttribute('aria-valuenow',Math.round(v*100));const text=type==='poly'&&el.dataset.knob==='fmRatio'?polyFmRatio(v).toFixed(2)+'×':Math.round(v*100);mount.querySelector(`[data-val="${el.dataset.knob}"]`).textContent=text;if(el.dataset.knob==='fmRatio')el.setAttribute('aria-valuetext',text)});$$('[data-opt]').forEach(el=>el.value=p[el.dataset.opt]);$$('[data-fader]').forEach(el=>{el.value=p[el.dataset.fader];const output=mount.querySelector(`[data-val="${el.dataset.fader}"]`);if(output)output.textContent=Math.round(p[el.dataset.fader]*100)});sequence.refresh();drawWave();polyArpPanel?.refresh();buchlaPanel?.refresh();coarsePanels.forEach(panel=>panel.refresh())};
  const showSteps=()=>sequence.refresh();
  function drawWave(){const cv=$('.cri-wave');if(!cv||!cv.getContext)return;let c=cv.getContext('2d');if(!c)return;c.clearRect(0,0,680,115);c.strokeStyle=type==='texture'?'#153b56':'#fff';c.lineWidth=2;c.beginPath();for(let i=0;i<680;i++){let x=i/680*TAU*5;let kind=p.engine||'WAVETABLE';let y=kind==='NOISE'?Math.sin(x*7.7)*Math.sin(x*33.1)*.8:kind==='RESONATOR'?Math.sin(x)*Math.exp(-((i/680)*5)%1*3):kind==='RING'?Math.sin(x)*Math.sin(x*(2+p.character*12)):kind==='WAVEFOLD'?Math.sin(Math.sin(x)*(2+p.character*16)):kind==='FM MATRIX'?Math.sin(x+Math.sin(x*(1+p.wave*8))*p.fm*5):kind==='FORMANT'?Math.sin(x)*Math.sin(x*.4)*.6:Math.sin(x)*(1-p.wave)+Math.sin(3*x+p.wave*6)*p.wave*.45+Math.sin(7*x+p.fm*8)*p.ring*.7;let yy=56-y*29;if(i===0)c.moveTo(i,yy);else c.lineTo(i,yy)}c.stroke()}
  function patch(i){i=((i%presets.length)+presets.length)%presets.length;history.push({...p});if(history.length>40)history.shift();if(type==='texture')engine?.retireVoices?.();Object.assign(p,cfg.preset,presets[i][1]);currentPreset=presets[i][0];$('#cri-presets').value=i;$('#cri-patchname').textContent=currentPreset;engine?.update?.();syncUI();$('#cri-status').textContent='Loaded '+currentPreset}
@@ -439,7 +434,7 @@ export function createRackInstrument(mount,type,{externalClock=false,tempo=()=>1
  };
  $('#cri-undo').onclick=()=>{let h=history.pop();if(h){Object.assign(p,h);engine?.update?.();syncUI();$('#cri-status').textContent='Previous sound restored'}};
  $('#cri-save').onclick=()=>{const blob=new Blob([JSON.stringify({format:'clawstudio-rack-device',version:1,type,state},null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`ClawStudio-${type}-patch.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2500)};
- $('#cri-load').onclick=()=>$('#cri-loadfile').click();$('#cri-loadfile').onchange=async e=>{try{const obj=JSON.parse(await e.target.files[0].text());if(obj.format!=='clawstudio-rack-device'||obj.type!==type||!obj.state||!Array.isArray(obj.state.patterns)||obj.state.patterns.length!==8)throw Error('Incorrect preset format');const loadedParams={...cfg.preset,...obj.state.p};Object.assign(state,{...obj.state,p});Object.assign(p,loadedParams);if(type==='texture'){persistentPatch.splice(0,persistentPatch.length,...(Array.isArray(obj.state.patchRoutes)?obj.state.patchRoutes:BUCHLA_DEFAULT_ROUTES()));state.patchRoutes=persistentPatch;buchlaPanel?.refresh()}if(type==='poly'){state.polyArp={...newPolyArp(),...(obj.state.polyArp||{})};polyModState();syncPolyMod();polyModPanel?.refresh()}Object.assign(p,state.p);if(!LENGTHS.includes(state.steps))state.steps=16;normalizeBank(state);selected=0;engine?.update?.();syncUI();$('#cri-status').textContent='Patch loaded'}catch(ex){$('#cri-status').textContent='Cannot load: '+ex.message}};
+ $('#cri-load').onclick=()=>$('#cri-loadfile').click();$('#cri-loadfile').onchange=async e=>{try{const obj=JSON.parse(await e.target.files[0].text());if(obj.format!=='clawstudio-rack-device'||obj.type!==type||!obj.state||!Array.isArray(obj.state.patterns)||obj.state.patterns.length!==8)throw Error('Incorrect preset format');const loadedParams={...cfg.preset,...(type==='poly'?normalizePolyVoice(obj.state.p):obj.state.p)};Object.assign(state,{...obj.state,p});Object.assign(p,loadedParams);if(type==='texture'){persistentPatch.splice(0,persistentPatch.length,...(Array.isArray(obj.state.patchRoutes)?obj.state.patchRoutes:BUCHLA_DEFAULT_ROUTES()));state.patchRoutes=persistentPatch;buchlaPanel?.refresh()}if(type==='poly'){state.polyArp={...newPolyArp(),...(obj.state.polyArp||{})};polyModState();syncPolyMod();polyModPanel?.refresh()}Object.assign(p,state.p);if(!LENGTHS.includes(state.steps))state.steps=16;normalizeBank(state);selected=0;engine?.update?.();syncUI();$('#cri-status').textContent='Patch loaded'}catch(ex){$('#cri-status').textContent='Cannot load: '+ex.message}};
  function init(context,destination){if(engine)return engine;ctx=context;engine=type==='poly'?new PolyEngine(ctx,destination,p):type==='texture'?new TextureEngine(ctx,destination,p):new AcidEngine(ctx,destination,p);if(type==='texture')engine.patchRoutes=persistentPatch;if(type==='poly')syncPolyMod();return engine}
  function scheduleStep(step,t,dur){if(!state.active||!engine)return;const i=step%state.steps;
   if(type==='poly'&&state.polyArp?.enabled){for(const event of arpEventsAtStep(state.polyArp,state.root,step,dur))engine.note(event.note,t+event.offset,event.length,event.velocity)}

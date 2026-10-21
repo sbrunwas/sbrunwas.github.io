@@ -1,7 +1,7 @@
 export const clawPatchbay=(()=>{
   const SOURCE_IDS=['LFO A','LFO B','ENV','VELOCITY','S&H','VOICE OSC','VOICE ENV'];
   const SOURCE_BY_TYPE={mono:SOURCE_IDS.slice(0,5),poly:SOURCE_IDS,texture:['MOD OSC','CYCLE','RANDOM','ENVELOPE','MOTION','S&H']};
-  const DEST_IDS={mono:['LP FREQ','HP FREQ','PITCH','RESONANCE','FM INDEX','LEVEL'],poly:['LP FREQ','PITCH','OSC2 PITCH','RESONANCE','LEVEL','DETUNE','OSC MIX','OSC2 LEVEL','FILTER ENV','PAN'],texture:['TIMBRE','FOLD','LPG','FILTER','FM','PAN','FILTER 2','RESONANCE','RES 2','PITCH','LEVEL']};
+  const DEST_IDS={mono:['LP FREQ','HP FREQ','PITCH','RESONANCE','FM INDEX','LEVEL'],poly:['LP FREQ','PITCH','OSC2 PITCH','RESONANCE','LEVEL','DETUNE','OSC MIX','OSC2 LEVEL','FM INDEX','FILTER ENV','PAN'],texture:['TIMBRE','FOLD','LPG','FILTER','FM','PAN','FILTER 2','RESONANCE','RES 2','PITCH','LEVEL']};
   const COLOR={'MOD OSC':'#5cd7ea','CYCLE':'#b59df5','RANDOM':'#ff7c9a','ENVELOPE':'#ffc969','MOTION':'#88e9ac','LFO A':'#5cd7ea','LFO B':'#b59df5','ENV':'#ffc969','VELOCITY':'#ff7c9a','S&H':'#f99e52','VOICE OSC':'#88e9ac','VOICE ENV':'#ff94cd'};
   const rateFromSlider=(v,max=18)=>.001*Math.pow(max/.001,Math.max(0,Math.min(1,Number(v)||0)));
   const rateToSlider=(v,max=18)=>Math.max(0,Math.min(1,Math.log(Math.max(.001,v)/.001)/Math.log(max/.001)));

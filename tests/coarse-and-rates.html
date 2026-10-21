@@ -9,7 +9,7 @@ async function pitch(type,semitones,live=false){
  const mount=document.createElement('div');document.body.append(mount);const rack=type==='mono'?createBass01(mount):createRackInstrument(mount,type),p=rack.state.params||rack.state.p;
  Object.assign(p,{coarse1:semitones,coarse2:0,attack:0,decay:.2,sustain:1,release:.1,cutoff:1,env:0,res:0,drive:0,motion:0,evolve:0,depth:0,chorus:0,delay:0,space:0,feedback:0,level:.7,volume:.7});
  if(type==='mono')Object.assign(p,{mode:'FM',fmIndex:0,fmRatio:1,saw:1,pulse:0,sub:0,noise:0,hp:0,lp:1,hpres:0,lpres:0,filterEnv:0,duck:0,lfo1Depth:0,lfo2Depth:0});
- if(type==='poly')Object.assign(p,{wave:'FM',shape:0,mix:0,tune:.5});
+ if(type==='poly')Object.assign(p,{wave:'FM',shape:0,mix:0,tune:.5,osc2Gain:0});
  if(type==='texture'){Object.assign(p,{engine:'WAVETABLE',second:0,third:0,wave:0,pace:'DRONE',filterB:'LOWPASS',filter2:1,buchlaFold:0,buchlaLpg:0,filterEnv:0});rack.state.patchRoutes.splice(0)}
  const ctx=new OfflineAudioContext(2,48000,48000),engine=rack.init(ctx,ctx.destination);
  if(type==='mono')engine.noteOn(57,0,1);else engine.note(57,0,1);

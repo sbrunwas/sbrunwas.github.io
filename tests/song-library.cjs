@@ -137,6 +137,47 @@ function drumHits(project) {
     assert.equal(await page.locator('#c-song-name').inputValue(), 'Unsaved title');
     assert.equal(drumHits(await exportProject()), 1);
     console.log('PASS saving updates a song, renaming preserves the original, and canceling keeps edits');
+    // New Poly synthesis settings belong to songs and portable projects too.
+    acceptChanges = true;
+    await page.locator('#c-poly-select').click();
+    const poly = page.locator('#c-poly-mount');
+    await poly.locator('[data-opt="osc2"]').selectOption('FORMANT');
+    const newKnobs = ['osc2Gain','fmAmount','fmRatio','detune2','mix2','shape2','tune2'];
+    for (const key of newKnobs) await poly.locator(`[data-knob="${key}"]`).press('ArrowUp');
+    const envelope = {filterAttack: .13, filterDecay: .34, filterSustain: .56, filterRelease: .78};
+    for (const [key, value] of Object.entries(envelope)) await poly.locator(`[data-fader="${key}"]`).fill(String(value));
+    const designed = await save('Poly sound design');
+    const designProject = await exportProject();
+    await page.locator('#c-song-new').click();
+    await status('Blank patterns');
+    await load(designed, 'Poly sound design');
+    assert.deepEqual((await exportProject()).rack.poly.p, designProject.rack.poly.p);
+
+    // Opening an old project after using the new controls must reset missing settings.
+    const legacyProject = structuredClone(designProject), oldPoly = legacyProject.rack.poly.p;
+    for (const key of [...newKnobs, ...Object.keys(envelope)]) delete oldPoly[key];
+    Object.assign(oldPoly, {osc2: 'TRI', shape: .7, decay: .6});
+    await page.locator('#cs17-project-file').setInputFiles({
+      name: 'legacy-poly.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(legacyProject))
+    });
+    await page.waitForFunction(() => document.querySelector('#cs17-project-status').textContent.includes('Imported legacy-poly.json'));
+    const migrated = (await exportProject()).rack.poly.p;
+    assert.equal(migrated.osc2, 'TRI');
+    assert.equal(migrated.fmAmount, 0);
+    assert.equal(migrated.osc2Gain, .22);
+    assert.equal(migrated.tune2, .7);
+    assert.equal(migrated.filterSustain, 0);
+    assert.ok(Math.abs(migrated.filterDecay - Math.sqrt((.9 - .025) / 2)) < 1e-9);
+
+    // Standalone patch import follows the same migration path.
+    await poly.locator('[data-knob="fmAmount"]').press('ArrowUp');
+    await poly.locator('#cri-loadfile').setInputFiles({
+      name: 'legacy-patch.json', mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify({format: 'clawstudio-rack-device', version: 1, type: 'poly', state: legacyProject.rack.poly}))
+    });
+    await page.waitForFunction(() => document.querySelector('#c-poly-mount #cri-status').textContent === 'Patch loaded');
+    assert.equal((await exportProject()).rack.poly.p.fmAmount, 0);
+    console.log('PASS new Poly controls persist in songs/projects, and old projects/patches reset missing controls safely');
     assert.deepEqual(errors, []);
   } finally {
     await browser.close();

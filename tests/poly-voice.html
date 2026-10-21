@@ -1,0 +1,114 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Poly oscillator, FM and filter ADSR regressions</title><pre id="results">Running…</pre><script type="module">
+import {createRackInstrument} from '../clawstudio/rack-devices.js';
+import {POLY_WAVEFORMS,POLY_VOICE_DEFAULTS,normalizePolyVoice,polyFmRatio} from '../clawstudio/poly-voice.js';
+const results=document.querySelector('#results'),lines=[];
+const assert=(ok,message)=>{if(!ok)throw Error(message)};
+const near=(actual,expected,tolerance=.002)=>assert(Math.abs(actual-expected)<tolerance,`${actual} should be near ${expected}`);
+const difference=(a,b,start=.1,end=.5)=>{let sum=0;for(let i=Math.floor(start*48000);i<end*48000;i++)sum+=(a[i]-b[i])**2;return Math.sqrt(sum/((end-start)*48000))};
+const power=(a,start=.1,end=.5)=>{let sum=0;for(let i=Math.floor(start*48000);i<end*48000;i++)sum+=a[i]**2;return sum/((end-start)*48000)};
+const pass=message=>{lines.push('PASS '+message);results.textContent=lines.join('\n')};
+async function render(params={}, {isolate=null,live=null,patch=false,duration=1.4,gate=1.1,inspect=null}={}){
+ const originalRandom=Math.random;Math.random=()=>.25;
+ const mount=document.createElement('div');document.body.append(mount);const rack=createRackInstrument(mount,'poly');
+ const p=rack.state.p;
+ Object.assign(p,{wave:'FM',osc2:'FM',shape:0,shape2:0,mix:0,mix2:0,detune:0,detune2:0,tune:.5,tune2:.5,osc2Gain:0,
+  attack:0,decay:.1,sustain:1,release:.4,cutoff:1,res:0,env:0,motion:0,chorus:0,delay:0,level:.7,...params});
+ const ctx=new OfflineAudioContext(4,Math.ceil(48000*duration),48000),bus=ctx.createGain(),split=ctx.createChannelSplitter(2),merge=ctx.createChannelMerger(4);
+ bus.connect(split);split.connect(merge,0,0);split.connect(merge,1,1);merge.connect(ctx.destination);
+ const engine=rack.init(ctx,bus);
+ if(patch)engine.setPatch([{source:'LFO A',dest:'FM INDEX',depth:.4}],{a:2,b:1,hold:2});
+ engine.note(60,.02,gate);const voice=engine.voices[0];voice.filterEnvelope.connect(merge,0,2);voice.crossFM.connect(merge,0,3);
+ if(isolate===1)voice.osc2Gain.gain.value=0;
+ if(isolate===2)voice.oscillator1.output.disconnect(voice.cut);
+ if(live)ctx.suspend(.6).then(()=>{live(p,engine,voice);ctx.resume()});
+ try{const buffer=await ctx.startRendering();inspect?.(voice);const audio=new Float32Array(buffer.getChannelData(0)),filter=new Float32Array(buffer.getChannelData(2));assert(audio.every(Number.isFinite),'audio remains finite');return {audio,filter,fm:new Float32Array(buffer.getChannelData(3))}}
+ finally{rack.dispose();mount.remove();Math.random=originalRandom}
+}
+try{
+ // OSC 2 must produce the actual engine output of each mode, not selector aliases.
+ const settings={mix:.6,mix2:.6,shape:.6,shape2:.6,detune:.45,detune2:.45,osc2Gain:1};
+ const waveAudio={};
+ for(const kind of POLY_WAVEFORMS){
+  const params={...settings,wave:kind,osc2:kind};
+  const first=await render(params,{isolate:1,duration:.7,gate:.6});
+  const second=await render(params,{isolate:2,duration:.7,gate:.6});
+  assert(power(second.audio)>1e-6,kind+' is audible on OSC 2');
+  assert(difference(first.audio,second.audio)<1e-7,kind+' matches OSC 1 synthesis');
+  waveAudio[kind]=second.audio;
+ }
+ for(const kind of ['SUPER SAW','PWM','FEEDBACK','SYNC','SHAPE','FM','FORMANT','TRI'])assert(difference(waveAudio.SAW,waveAudio[kind])>1e-4,kind+' has a distinct sound');
+ pass('OSC 2 renders every OSC 1 waveform with matching synthesis and distinct timbres');
+
+ const silent=await render({osc2Gain:0},{isolate:2});
+ const loud=await render({osc2Gain:.75},{isolate:2});
+ assert(power(silent.audio)<1e-12,'OSC 2 gain can fully mute its audible output');
+ assert(power(loud.audio)>1e-5,'OSC 2 gain raises its output');
+ // Mutations go through update, as the panel does.
+ const liveGainUpdated=await render({osc2Gain:0},{isolate:2,live:(p,e)=>{p.osc2Gain=.75;e.update()}});
+ assert(power(liveGainUpdated.audio,.1,.5)<1e-12,'no early gain change');
+ assert(power(liveGainUpdated.audio,.8,1)>1e-5,'gain changes a held voice');
+ pass('OSC 2 gain mutes, raises and changes a held voice independently');
+
+ const plain=await render(),fm=await render({fmAmount:.35}),ratio=await render({fmAmount:.35,fmRatio:.6});
+ assert(difference(plain.audio,fm.audio)>1e-3,'silent OSC 2 still modulates OSC 1');
+ assert(difference(fm.audio,ratio.audio)>1e-3,'FM ratio changes sidebands');
+ const triangleFM=await render({fmAmount:.35,osc2:'TRI'});
+ assert(difference(fm.audio,triangleFM.audio)>1e-3,'FM uses OSC 2 selected waveform');
+ const liveFM=await render({}, {live:(p,e)=>{p.fmAmount=.35;e.update()}});
+ assert(difference(plain.audio,liveFM.audio)<1e-7,'FM unchanged before knob movement');
+ assert(difference(plain.audio,liveFM.audio,.8,1)>1e-3,'FM knob changes held voice');
+ const patchedFM=await render({}, {patch:true});
+ assert(difference(plain.audio,patchedFM.audio)>1e-4,'FM INDEX patch input changes rendered audio');
+ const patchedLive=await render({}, {patch:true,live:(p,e)=>{p.fmAmount=.35;e.update()}});
+ assert(difference(patchedFM.audio,patchedLive.audio)<1e-7,'patch stays unchanged before depth movement');
+ assert(difference(patchedFM.audio,patchedLive.audio,.8,1)>1e-3,'FM knob adds to cable modulation');
+ const unplugged=await render({fmAmount:.35},{patch:true,live:(p,e)=>e.setPatch([],e.patchRates)});
+ // Carrier phase retains its history; compare the actual FM voltage after unplugging.
+ assert(difference(fm.fm,unplugged.fm,.8,1)<1e-5,'unplugging restores FM knob base');
+ near(polyFmRatio(0),.25);near(polyFmRatio(.4),1);near(polyFmRatio(1),8);
+ pass('true OSC 2 → OSC 1 FM works with muted OSC 2, waveform selection, ratio, live depth and additive patching');
+
+ const slow={filterAttack:.4,filterDecay:.25,filterSustain:.6,filterRelease:.2};
+ const fast={filterAttack:0,filterDecay:.1,filterSustain:0,filterRelease:0};
+ const contour=await render(slow,{gate:.75});
+ const time=.02,at=.003+.4**2*1.8,dc=.025+.25**2*2,rt=.035+.2**2*4;
+ const sample=seconds=>contour.filter[Math.round(seconds*48000)];
+ near(sample(time+.1),.0001+(1-.0001)*.1/at);
+ near(sample(time+at),1);
+ near(sample(time+at+dc),.6+.4*Math.exp(-3));
+ near(sample(time+.75),.6,.004);
+ near(sample(time+.75+rt),.0001+(.6-.0001)*Math.exp(-3),.004);
+ const other=await render(fast,{gate:.75});
+ assert(difference(contour.audio,other.audio)<1e-7,'filter ADSR does not change amp when envelope depth is zero');
+ const brightSlow=await render({...slow,cutoff:.2,env:1},{gate:.75});
+ const brightFast=await render({...fast,cutoff:.2,env:1},{gate:.75});
+ assert(difference(brightSlow.audio,brightFast.audio)>1e-3,'independent contour audibly moves the filter');
+ const short=await render({filterAttack:.8,filterSustain:1,filterRelease:.1},{gate:.05});
+ assert(Math.max(...short.filter.subarray(0,24000))<.05,'short gates release from current attack level');
+ pass('separate filter ADSR renders attack, decay, sustain and release, including gates shorter than attack');
+
+ // Switching modes while held updates the full bank, not only the first oscillator.
+ const held=await render({osc2:'SAW',osc2Gain:.6},{isolate:2,live:(p,e)=>{p.osc2='SUPER SAW';p.mix2=.8;p.detune2=.7;e.update()},inspect:v=>assert(v.oscillator2.layers.every(layer=>layer.gain.value>0),'all seven saw layers active')});
+ const heldPlain=await render({osc2:'SAW',osc2Gain:.6},{isolate:2});
+ assert(difference(held.audio,heldPlain.audio)<1e-7,'mode unchanged before selector change');
+ assert(difference(held.audio,heldPlain.audio,.8,1)>1e-3,'waveform changes held voice');
+ pass('waveform changes on held notes activate the full oscillator bank');
+
+ const mount=document.createElement('div');document.body.append(mount);const rack=createRackInstrument(mount,'poly'),p=rack.state.p;
+ const options=key=>[...mount.querySelector(`[data-opt="${key}"]`).options].map(o=>o.value);
+ assert(JSON.stringify(options('wave'))===JSON.stringify(options('osc2')),'same dropdown waveforms');
+ for(const key of ['osc2Gain','detune2','mix2','shape2','fmAmount','fmRatio']){
+  const knob=mount.querySelector(`[data-knob="${key}"]`),before=p[key];knob.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true}));assert(p[key]>before,key+' panel edits parameter');
+ }
+ const ampBefore=[p.attack,p.decay,p.sustain,p.release];
+ for(const key of ['filterAttack','filterDecay','filterSustain','filterRelease']){const input=mount.querySelector(`[data-fader="${key}"]`);input.value=.7;input.dispatchEvent(new Event('input'))}
+ assert(JSON.stringify(ampBefore)===JSON.stringify([p.attack,p.decay,p.sustain,p.release]),'filter sliders leave amp controls independent');
+ rack.dispose();mount.remove();
+ const old=normalizePolyVoice({osc2:'TRI',shape:.7,decay:.6});
+ assert(old.osc2==='TRI'&&old.fmAmount===0&&old.osc2Gain===.22,'legacy waves and silent FM preserved');
+ near(old.tune2,.7);near(old.filterDecay,Math.sqrt((.9-.025)/2));
+ assert(Object.keys(POLY_VOICE_DEFAULTS).every(key=>Number.isFinite(old[key])),'legacy values all default correctly');
+ pass('panel controls work independently and old patches migrate to safe values');
+ document.documentElement.dataset.result='passed';
+}catch(error){document.documentElement.dataset.result='failed';results.textContent=lines.join('\n')+'\nFAIL '+error.stack;throw error}
+</script></html>
