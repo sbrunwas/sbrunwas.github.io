@@ -59,8 +59,10 @@
 .claw .cs17-project b{color:#e2c590;font-size:10px;letter-spacing:1px}.claw .cs17-project small{display:block;font-size:10px;color:#bdd1bd;margin-top:3px}
 .claw .cs17-actions{display:flex;flex-wrap:wrap;gap:5px}.claw .cs17-actions button{background:#304f41;border-color:#70977d;font-size:10px;font-weight:750;min-height:31px}
 .claw #cs17-save-project{background:#b5d09b;color:#1b3525}.claw #cs17-restore{border-color:#a7c9a2}
+.claw .song-library{display:flex;align-items:center;flex-wrap:wrap;gap:9px;padding:11px 13px;background:#20362a;border-bottom:1px solid #557466}.claw .song-library label{display:flex;flex-direction:column;gap:4px;font-size:8px;letter-spacing:.1em;color:#bdd1bd}.claw .song-library select,.claw .song-library input{min-height:33px;background:#14251a;color:#e6f1e5;border:1px solid #70977d;border-radius:3px;padding:6px 8px}.claw .song-library select{max-width:310px}.claw .song-library .song-title{flex:1;min-width:130px}.claw .song-library input{width:100%;box-sizing:border-box}.claw .song-library button{min-height:33px;font-size:10px;font-weight:800;align-self:flex-end}.claw #c-song-save{background:#b5d09b;color:#1b3525}.claw .song-library small{flex-basis:100%;font-size:10px;color:#bdd1bd}.claw .song-library button:disabled{opacity:.5;cursor:wait}
 </style>
 <div class="head"><div><div class="brand">CLAW<em>STUDIO</em></div><div class="small">RACK + PERFORMANCE DESK · v0.19 · MASTER PERFORMANCE FX</div></div><div class="transport"><button id="c-play" class="onair">▶ JAM</button><button id="c-stop">■ STOP</button><span class="small">BPM</span><input id="c-bpm" type="number" min="60" max="180" value="126"><button id="c-rec">● REC</button><button type="button" class="claw-mute-all" aria-pressed="false" title="Mute every mixer channel; unmute strips individually">■ MUTE ALL</button></div></div>
+<div class="song-library"><label>SONG<select id="c-song-picker" aria-label="Song library"><option value="blank">NEW / BLANK SONG</option><option value="factory">BLUE HOUR · DEMO</option></select></label><button type="button" id="c-song-load">LOAD SONG</button><button type="button" id="c-song-new">NEW SONG</button><label class="song-title">NAME<input id="c-song-name" maxlength="64" placeholder="Untitled" aria-label="Song name"></label><button type="button" id="c-song-save">SAVE SONG</button><small id="c-song-status" role="status">Blank patterns · songs are saved in this browser</small></div>
 <div class="nav"><button id="c-racktab" class="active">▦ RACK</button><button id="c-desktab">▤ DESK</button><span class="engine" id="c-engine">DRUM MACHINE · LOCAL ENGINE</span></div>
 <div class="cs17-project"><div><b>PROJECT MEMORY</b><small id="cs17-project-status">Sampler reels need a backup · browser recovery is local to this device</small></div><div class="cs17-actions"><button type="button" id="cs17-save-project">↓ SAVE PROJECT</button><button type="button" id="cs17-backup">▣ BACKUP IN BROWSER</button><button type="button" id="cs17-restore">↶ RESTORE BACKUP</button><button type="button" id="cs17-load-project">↑ OPEN PROJECT</button><input id="cs17-project-file" type="file" accept=".json,application/json" hidden></div></div>
 <div class="view current" id="c-rack">
@@ -103,11 +105,11 @@
 
 .cs10-plots .cs10-stereo{display:none}@media(min-width:1100px){.cs10-plots{grid-template-columns:1fr 1fr 160px}.cs10-plots .cs10-stereo{display:block}}
 </style><script type="module">
-import {createRackInstrument} from "./rack-devices.js?v=shared-seq-20261021";
+import {createRackInstrument} from "./rack-devices.js?v=blank-song-library-20261021";
 import {createSamplerRack} from "./sampler.js";
 import {createKickSidechain,kickAtStep,sidechainTiming} from "./sidechain.js";
 import {HARMONY_DEFAULTS,mountHarmonyPanel,linkHarmony,normalizeHarmony} from "./harmony.js";
-import {validateProject,saveLocalProject,loadLocalProject,projectBlob} from "./project-session.js";
+import {validateProject,saveLocalProject,loadLocalProject,projectBlob,saveSong,listSongs,loadSong} from "./project-session.js?v=blank-song-library-20261021";
 import {STARTER_TITLE,installStarterPatterns,buildStarterArrangement} from "./starter-song.js?v=shared-seq-20261021";
 import {createMasterPerformanceFX} from "./master-performance.js";
 const {createConductor}=(()=>{
@@ -118,12 +120,12 @@ const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 function createConductor({mount,sceneHost,analysisHost,ioHost,status,access,applyScene,captureScene,getAudio,trigger}){
   const $=(id)=>document.getElementById(id);
   const escapeHTML=x=>String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const freshScene=i=>({name:['INTRO','GROOVE','LIFT','BREAK','BUILD','DROP','OUTRO','LOOP'][i],bars:i===0||i===6?4:8,data:null});
+  const freshScene=i=>({name:'SCENE '+String(i+1).padStart(2,'0'),bars:4,data:null});
   const scenes=Array.from({length:8},(_,i)=>freshScene(i));
-  const lanes=Array.from({length:4},(_,i)=>({name:['BASS','LEAD','ATMOS','ACID'][i],target:DESTINATIONS[i],midiChannel:i+1,enabled:false,steps:Array.from({length:16},(_,j)=>({on:i===0&&j%4===0,note:[36,48,60,36][i]+(j%8===4?7:0),gate:.72,velocity:105}))}));
+  const lanes=Array.from({length:4},(_,i)=>({name:['BASS','LEAD','ATMOS','ACID'][i],target:DESTINATIONS[i],midiChannel:i+1,enabled:false,steps:Array.from({length:16},(_,j)=>({on:false,note:[36,48,60,36][i]+(j%8===4?7:0),gate:.72,velocity:105}))}));
   let hasSavedSong=false;
   let sceneIndex=0,queued=-1,auto=false,bar=0,absoluteBar=0,barOffset=0,selectedLane=0,selectedStep=0,midi=null,midiOut=null,midiIn=null,sendExternal=false,visualRAF=null,canvasData=null,audioInput=null,stream=null,inputGain=null,analyzerLeft=null,analyzerRight=null,splitter=null;
-  const SAVE_KEY='clawstudio-scene-conductor-v10';
+  const SAVE_KEY='clawstudio-scene-conductor-v12';
   const totalBars=()=>scenes.reduce((s,x)=>s+x.bars,0);
   const getCurrentScene=()=>scenes[sceneIndex];
   function snapshot(){getCurrentScene().data={...captureScene(),conductorLanes:structuredClone(lanes)};persist();refreshScenes();status('Stored scene '+(sceneIndex+1)+' · '+getCurrentScene().name+' · four CLAWSTEP lanes included')}
@@ -132,10 +134,7 @@ function createConductor({mount,sceneHost,analysisHost,ioHost,status,access,appl
   function nextScene(index){queued=clamp(index,0,7);refreshScenes()}
   function sceneBoundary(){if(queued>=0){loadScene(queued);return;}if(auto){const scene=scenes[sceneIndex];if(bar>=scene.bars){loadScene((sceneIndex+1)%scenes.length)}}}
   function sceneNode(i){const s=scenes[i];const el=document.createElement('button');el.type='button';el.className='cs10-scene'+(i===sceneIndex?' live':'')+(i===queued?' queued':'');el.dataset.scene=i;el.style.flex=Math.max(2,s.bars)+' 1 0';el.innerHTML=`<strong>${String(i+1).padStart(2,'0')}</strong><span>${escapeHTML(s.name)}</span><small>${s.bars} BARS${s.data?' · ●':''}</small><i class="cs10-progress"></i>`;el.title='Click to queue scene for next bar; shift-click to recall immediately';el.onclick=e=>{if(e.shiftKey||!access.isPlaying())loadScene(i);else nextScene(i)};return el}
-  try{const saved=JSON.parse(localStorage.getItem(SAVE_KEY)||'null');if(saved?.version===1&&saved.scenes?.length===8&&saved.lanes?.length===4){hasSavedSong=true;auto=Boolean(saved.auto);sceneIndex=clamp(Number(saved.sceneIndex)||0,0,7);
-    for(let i=0;i<8;i++){const x=saved.scenes[i];if(typeof x.name==='string'&&[1,2,4,8,16].includes(x.bars))scenes[i]={name:x.name.slice(0,16),bars:x.bars,data:x.data||null}}
-    for(let i=0;i<4;i++){const x=saved.lanes[i];if(!Array.isArray(x.steps)||x.steps.length!==16)continue;lanes[i].enabled=!!x.enabled;lanes[i].target=DESTINATIONS.includes(x.target)?x.target:lanes[i].target;lanes[i].midiChannel=clamp(+x.midiChannel||1,1,16);for(let j=0;j<16;j++){const a=x.steps[j];lanes[i].steps[j]={on:!!a.on,note:clamp(+a.note||36,0,127),gate:clamp(+a.gate||.7,.08,1),velocity:clamp(+a.velocity||100,1,127)}}}
-  }}catch{/* fresh defaults */}
+  // Start blank; prior maps are available explicitly from the Song picker.
   sceneHost.innerHTML=`<section class="cs10-scene-panel"><div class="cs10-top"><b>SONG MAP / SCENE PERFORMANCE</b><span class="cs10-pill">NOT AN ARRANGEMENT TIMELINE</span><span id="cs10-where">SCENE 01 · BAR 1 / 4</span></div><div id="cs10-map" class="cs10-map"></div><div class="cs10-toolbar"><label>SCENE NAME <input id="cs10-name" maxlength="16"></label><label>SCENE LENGTH <select id="cs10-bars"><option>1</option><option>2</option><option>4</option><option>8</option><option>16</option></select></label><button id="cs10-store">● CAPTURE SCENE</button><button id="cs10-auto">AUTO CHAIN OFF</button><button id="cs10-reset">↶ RESTART SONG</button><button type="button" id="cs18-demo" title="Replace current scene map with the cohesive Blue Hour factory jam">♫ LOAD BLUE HOUR</button><button id="cs10-save">SAVE SONG MAP</button><button id="cs10-load">LOAD</button><input id="cs10-file" type="file" accept=".json" hidden></div></section>`;
   mount.innerHTML=`<section class="cs10-sequencer"><div class="cs10-top"><b>CLAWSTEP / FOUR-TRACK PERFORMANCE SEQUENCER</b><span class="cs10-pill">INDEPENDENT PATTERNS · SCENE SYNC</span></div><div class="cs10-lanes" id="cs10-lanes"></div><div class="cs10-stepedit"><b id="cs10-editlabel">STEP 01</b><label>NOTE <input id="cs10-note" type="number" min="0" max="127" value="36"></label><label>GATE <input id="cs10-gate" type="range" min=".08" max="1" step=".02" value=".72"></label><label>VELOCITY <input id="cs10-velocity" type="range" min="1" max="127" step="1" value="105"></label><span id="cs10-stepvalue"></span></div><div class="cs10-help">Tap to select a step; tap it again to toggle. One lane can trigger any rack engine or an external MIDI device. MIDI output requires Chrome/Edge desktop.</div></section>`;
   analysisHost.innerHTML=`<section class="cs10-analysis"><div class="cs10-top"><b>MASTER SCOPE / STEREO ANALYZER</b><span class="cs10-pill">LIVE AUDIO · NO PRETEND SIGNAL</span></div><div class="cs10-plots"><div><small>STEREO WAVEFORM / L–R</small><canvas id="cs10-wave" width="880" height="140" aria-label="Live stereo waveform"></canvas></div><div><small>FFT / STEREO SPECTRUM L–R</small><canvas id="cs10-fft" width="880" height="140" aria-label="Live stereo frequency spectrum"></canvas></div><div class="cs10-stereo"><small>STEREO FIELD / PHASE CORRELATION</small><canvas id="cs10-xy" width="440" height="140" aria-label="Live stereo vectorscope"></canvas></div></div><div class="cs10-stats"><span id="cs10-rms">L — dBFS · R — dBFS</span><span id="cs10-peak">PEAK — dBFS</span><span id="cs10-correlation">PHASE —</span></div></section>`;
@@ -194,13 +193,13 @@ return {createConductor};
 })();
 import {AfterglowAudio} from "./audio.js";
 import {validateState,validateSamples} from "./state.js";
-import {createBass01} from "./bass01.js?v=shared-seq-20261021";
+import {createBass01} from "./bass01.js?v=blank-song-library-20261021";
 (()=>{
 const root=document.getElementById('clawstudio-root');if(root.dataset.loaded)return;root.dataset.loaded='1';
 const $=id=>root.querySelector('#'+id), all=q=>[...root.querySelectorAll(q)],clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
 const names=['KICK','SNARE','LOW TOM','MID TOM','HIGH TOM','RIM','CLAP','CLOSED HAT','OPEN HAT','CRASH','RIDE'];
 const voice=Array.from({length:11},()=>({model:0,tune:0,decay:.5,tone:.5,level:.8,pan:0,drive:0,mute:false,solo:false,reverse:false,sampleStart:0,sampleEnd:1}));
-const patterns=Array.from({length:16},(_,p)=>({length:16,steps:Array.from({length:11},(_,v)=>Array.from({length:64},(_,s)=>({on:s<16&&(v===0?s%4===0:v===1?s%8===4:v===7?s%2===0:v===6?p%4!==0&&s%8===4:false),velocity:.85,probability:1,ratchets:1})))}));
+const patterns=Array.from({length:16},(_,p)=>({length:16,steps:Array.from({length:11},(_,v)=>Array.from({length:64},(_,s)=>({on:false,velocity:.85,probability:1,ratchets:1})))}));
 const drum={bank:{patterns,chain:Array.from({length:64},(_,i)=>i%16),chainLength:4},voices:voice,tempo:126,swing:.08,master:.8,masterDrive:0,selectedPattern:0,chainMode:false,randomEnginePool:[0,1,3,4]};
 let selected=0,selectedStep=0,page=0,clipboard=null,randomUndo=null,sampleSlots=Array(11).fill(null),playing=false,step=0,next=0,interval,ctx,noiseBuffer,drumAudio=null,drumInit=null,rec=false,recChunks=[],recTap=null,fxNodes=null,mode='morph',A={},B={},links=[],conductor=null;
 const defs=[['drums','DRUM MACHINE','A','#d0b783'],['acid','MONO','B','#b0d7ba'],['poly','POLY','B','#809dd2'],['texture','TEXTURE','B','#e3d04b'],['tb303','ACID','A','#d0d1c9'],['sample','SAMPLER','A','#cfaed2'],['external','EXT IN','A','#a5b9aa']];
@@ -605,7 +604,7 @@ function sequencerTrigger(target,note,at,duration,velocity){
 function captureProject(){
  const drumSamples=sampleSlots.map(item=>item?{name:item.name,rate:item.sampleRate,left:floatTo64(item.left),right:floatTo64(item.right)}:null);
  return validateProject({
-  format:'clawstudio-project',version:1,savedAt:new Date().toISOString(),
+  format:'clawstudio-project',version:1,title:$('c-song-name').value.trim()||'Untitled',savedAt:new Date().toISOString(),
   drum:{state:clone(drum),samples:drumSamples},
   rack:{mono:clone(bass01.state),poly:clone(extraRacks.poly.state),texture:clone(extraRacks.texture.state),acid:clone(extraRacks.acid.state)},
   sampler:sampler.exportProject(),conductor:conductor.exportProject(),
@@ -662,17 +661,17 @@ async function doProjectAction(operation){
 $('cs17-save-project').onclick=()=>doProjectAction(async()=>{
  const project=captureProject();
  const date=new Date().toISOString().slice(0,10);
- downloadBlob(projectBlob(project),'ClawStudio-Project-'+date+'.json');
+ downloadBlob(projectBlob(project),'ClawStudio-Project-'+date+'.json');savedFingerprint=fingerprint(project);
  projectStatus('Full project downloaded with Drum Machine samples and Sampler reel audio');
 });
 $('cs17-backup').onclick=()=>doProjectAction(async()=>{
- const project=captureProject();await saveLocalProject(project);projectBackupArmed=true;
+ const project=captureProject();await saveLocalProject(project);projectBackupArmed=true;savedFingerprint=fingerprint(project);
  projectStatus('Project backed up in this browser · periodic recovery now enabled');
 });
 $('cs17-restore').onclick=()=>doProjectAction(async()=>{
  const project=await loadLocalProject();
  if(!project){projectStatus('No browser backup found · use OPEN PROJECT');return}
- await restoreProject(project);projectBackupArmed=true;projectStatus('Recovered local project · all four reels and scene patterns restored');
+ await restoreProject(project);projectBackupArmed=true;activeSongId=null;activeSongName=project.title||'Recovered project';activeChoice='';$('c-song-name').value=activeSongName;savedFingerprint=fingerprint();$('c-song-picker').value='';songStatus('Recovered project · SAVE SONG to add it to your library');projectStatus('Recovered local project · all four reels and scene patterns restored');
 });
 $('cs17-load-project').onclick=()=>$('cs17-project-file').click();
 $('cs17-project-file').onchange=e=>{
@@ -683,7 +682,7 @@ $('cs17-project-file').onchange=e=>{
   const project=validateProject(JSON.parse(await file.text()));
   await restoreProject(project);
   projectBackupArmed=true;
-  projectStatus('Imported '+file.name+' · consider BACKUP IN BROWSER');
+  activeSongId=null;activeSongName=project.title||file.name.replace(/\.json$/i,'');activeChoice='';$('c-song-name').value=activeSongName;savedFingerprint=fingerprint();$('c-song-picker').value='';songStatus('Project opened · SAVE SONG to add it to your library');projectStatus('Imported '+file.name+' · consider BACKUP IN BROWSER');
  });
 };
 setInterval(async()=>{
@@ -711,18 +710,9 @@ function starterPalette(){
  for(const mod of Object.values(extraRacks)){mod.getEngine()?.update?.();mod.refreshUI?.()}
  bass01.refreshUI?.();renderRack();renderVoice();$('c-bpm').value=drum.tempo;
 }
-function activateStarterSong({fresh=false}={}){
- if(playing)pause();
- if(!fresh&&!window.confirm('Replace the current instrument patterns and song map with BLUE HOUR? Save Project first to keep your own work.'))return;
- starterPalette();
- if(fresh&&conductor.scenes?.[0]?.data?.starterId==='blue-hour-v1'){
-  // This browser already stored Blue Hour: retain user-edited scene lengths
-  // and names, but restore the factory underlying (unsaved) instrument patterns.
-  conductor.recall(0);
- }else{
-  conductor.restoreProject(buildStarterArrangement(studioSnapshot()));
-  conductor.recall(0);
- }
+async function activateStarterSong(){
+ await restoreProject(structuredClone(blankProject));
+ starterPalette();conductor.restoreProject(buildStarterArrangement(studioSnapshot()));conductor.recall(0);
  $('c-status').textContent='BLUE HOUR · 122 BPM · A MINOR · press JAM to hear the arranged scenes';
 }
 
@@ -731,9 +721,40 @@ harmonicPanel=mountHarmonyPanel($('cs17-harmony-host'),harmonyState,{
  onApply:opts=>{const instruments=applyStudioHarmony(opts);$('c-status').textContent='Harmony aligned · '+instruments.join(' / ')},
  onFromPoly:()=>{const a=extraRacks.poly.state.polyArp;Object.assign(harmonyState,normalizeHarmony({...harmonyState,key:a.key,scale:a.scale,degree:a.degree}))}
 });
-$('cs18-demo').onclick=()=>activateStarterSong();
-if(!conductor.hasSavedSong)activateStarterSong({fresh:true});
-else if(conductor.scenes?.[0]?.data?.starterId==='blue-hour-v1')activateStarterSong({fresh:true});
+const blankProject=captureProject();
+let activeSongId=null,activeSongName='',activeChoice='blank',savedFingerprint='';
+const fingerprint=(source=captureProject())=>{const project={...source};delete project.savedAt;return JSON.stringify(project)};
+savedFingerprint=fingerprint();
+function songStatus(message){$('c-song-status').textContent=message}
+function legacyMaps(){const maps=[];for(const [id,key,label] of [['legacy-v10','clawstudio-scene-conductor-v10','Previous scene map (legacy)'],['legacy-v11','clawstudio-scene-conductor-v11','Previous scene map'],['legacy-v12','clawstudio-scene-conductor-v12','Last scene map']]){try{const map=JSON.parse(localStorage.getItem(key)||'null');if(map?.scenes?.length===8&&map?.lanes?.length===4&&(map.scenes.some(s=>s.data)||map.lanes.some(l=>l.enabled||l.steps?.some(s=>s.on))))maps.push({id,label,map})}catch{}}return maps}
+async function refreshSongPicker(selection=activeChoice){
+ const picker=$('c-song-picker');picker.replaceChildren();const add=(parent,value,text)=>{const option=document.createElement('option');option.value=value;option.textContent=text;parent.append(option)};
+ add(picker,'','CHOOSE A SONG');add(picker,'blank','NEW / BLANK SONG');add(picker,'factory','BLUE HOUR · DEMO');picker.value=selection;
+ let songs=[];try{songs=await listSongs()}catch(error){songStatus('Browser song library unavailable · use SAVE / OPEN PROJECT')}if(songs.length){const group=document.createElement('optgroup');group.label='SAVED IN THIS BROWSER';for(const song of songs)add(group,'saved:'+song.id,song.name);picker.append(group)}
+ const old=legacyMaps();if(old.length){const group=document.createElement('optgroup');group.label='SCENE MAPS';for(const entry of old)add(group,entry.id,entry.label);picker.append(group)}
+ picker.value=[...picker.options].some(o=>o.value===selection)?selection:'';
+}
+async function songAction(action){const controls=all('.song-library button,.song-library select,.song-library input');controls.forEach(el=>el.disabled=true);try{return await action()}catch(error){songStatus('Song: '+error.message);projectStatus('Song: '+error.message);return null}finally{controls.forEach(el=>el.disabled=false)}}
+function confirmSongChange(title){if(fingerprint()===savedFingerprint)return true;return window.confirm('Replace unsaved changes with '+title+'? Use SAVE SONG or SAVE PROJECT first to keep your current work.')}
+async function openLibrarySong(choice){
+ if(!choice)return songStatus('Choose a song to load.');let title='a blank song',project=null,legacy=null;
+ if(choice==='factory')title=STARTER_TITLE;
+ else if(choice.startsWith('saved:')){project=await loadSong(choice.slice(6));title=project.title||'Saved song'}
+ else if(choice.startsWith('legacy-')){legacy=legacyMaps().find(entry=>entry.id===choice);if(!legacy)throw Error('Scene map was not found');title=legacy.label}
+ if(!confirmSongChange(title)){$('c-song-picker').value=activeChoice;return}
+ if(playing)stop();projectBackupArmed=false;
+ if(choice==='factory'){await activateStarterSong()}
+ else if(legacy){if(legacy.map.scenes.some(s=>s.data?.starterId==='blue-hour-v1'))await activateStarterSong();else await restoreProject(structuredClone(blankProject));conductor.restoreProject(legacy.map);conductor.recall(legacy.map.sceneIndex||0)}
+ else await restoreProject(project||structuredClone(blankProject));
+ activeSongId=choice.startsWith('saved:')?choice.slice(6):null;activeSongName=choice==='blank'?'':title;activeChoice=choice;$('c-song-name').value=activeSongName;savedFingerprint=fingerprint();
+ await refreshSongPicker(choice);songStatus(choice==='blank'?'Blank patterns · ready to create rhythms':legacy?'Scene map loaded · full projects can be opened with OPEN PROJECT':'Loaded '+title+' · press JAM to play');
+}
+$('c-song-load').onclick=()=>songAction(()=>openLibrarySong($('c-song-picker').value));
+$('c-song-new').onclick=()=>songAction(()=>openLibrarySong('blank'));
+$('c-song-save').onclick=()=>songAction(async()=>{const name=$('c-song-name').value.trim(),project=captureProject(),savedState=fingerprint(project);const entry=await saveSong(name,project,name===activeSongName?activeSongId:null);activeSongId=entry.id;activeSongName=entry.name;activeChoice='saved:'+entry.id;$('c-song-name').value=entry.name;savedFingerprint=savedState;await refreshSongPicker();songStatus('Saved '+entry.name+' in this browser · SAVE PROJECT downloads a portable copy')});
+$('cs18-demo').onclick=()=>songAction(()=>openLibrarySong('factory'));
+refreshSongPicker().catch(error=>songStatus('Song library unavailable: '+error.message+' · use SAVE / OPEN PROJECT'));
+$('cs17-project-status').textContent='Blank workspace · OPEN PROJECT or RESTORE BACKUP to resume saved work';
 document.querySelector('#c-poly-mount #poly-arp-generate')?.addEventListener('click',()=>{
  if(!harmonyState.autoLink)return;
  const a=extraRacks.poly.state.polyArp;

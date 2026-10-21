@@ -6,3 +6,11 @@ Serve the repository root with `python3 -m http.server 8001`, then open a test p
 - `/tests/step-sequencer.html`: shared 16–64-step editing, exact 1/2/3/4-hit scheduling, chord voicings and inversions, notes and rests at loop boundaries, audible retriggers and accent dynamics in all four engines.
 
 Offline control-rate values are initialized explicitly so wall-clock timer scheduling does not affect comparisons.
+
+The song library also has an end-to-end test using Node.js and Playwright (`npm install --no-save playwright`, then `npx playwright install chromium`). With the repository-root server running, use:
+
+```sh
+node tests/song-library.cjs
+```
+
+Set `BASE_URL` for another server port, or `CHROMIUM_BIN` to use an existing Chromium executable. The test uses isolated browser storage and checks blank startup, explicit demo loading, named song save/load across refreshes, overwrite/rename behavior, unsaved-change cancellation, and preservation of older scene maps and browser backups.

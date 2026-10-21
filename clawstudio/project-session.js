@@ -59,3 +59,17 @@ export async function loadLocalProject(){
  finally{db.close()}
 }
 export function projectBlob(project){return new Blob([JSON.stringify(validateProject(project))],{type:'application/json'})}
+
+// Named songs use separate keys in the existing database; recovery stays at "latest".
+const songId=id=>{if(typeof id!=='string'||!/^[A-Za-z0-9_-]{1,80}$/.test(id))throw Error('Invalid saved song');return id};
+export async function saveSong(name,project,id=null){
+ const title=String(name||'').trim().slice(0,64);if(!title)throw Error('Enter a song name before saving');validateProject(project);
+ const key=id?songId(id):(globalThis.crypto?.randomUUID?.()||Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));const metadata={id:key,name:title,updatedAt:new Date().toISOString()},db=await openDatabase();
+ try{await new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite'),store=tx.objectStore(STORE);store.put({...project,title},'song-data:'+key);store.put(metadata,'song-meta:'+key);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||Error('Song could not be saved; download a project backup'));tx.onabort=()=>reject(tx.error||Error('Song save was interrupted'))});return metadata}finally{db.close()}
+}
+export async function listSongs(){
+ const db=await openDatabase();try{return await new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly'),request=tx.objectStore(STORE).getAll(IDBKeyRange.bound('song-meta:','song-meta:\uffff'));let songs=[];request.onsuccess=()=>{songs=request.result};tx.oncomplete=()=>resolve(songs.sort((a,b)=>a.name.localeCompare(b.name)||b.updatedAt.localeCompare(a.updatedAt)));tx.onerror=()=>reject(tx.error||Error('Song library could not be read'))})}finally{db.close()}
+}
+export async function loadSong(id){
+ const db=await openDatabase();try{return await new Promise((resolve,reject)=>{const request=db.transaction(STORE,'readonly').objectStore(STORE).get('song-data:'+songId(id));request.onsuccess=()=>{try{if(!request.result)throw Error('Saved song was not found');resolve(validateProject(request.result))}catch(error){reject(error)}};request.onerror=()=>reject(request.error||Error('Song could not be loaded'))})}finally{db.close()}
+}

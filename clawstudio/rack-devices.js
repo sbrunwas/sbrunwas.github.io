@@ -99,8 +99,7 @@ export function acidSlideFromPrevious(pattern,index,length){
  const prior=pattern[(index-1+length)%length];
  return Boolean(prior?.on&&prior?.slide);
 }
-const templates={poly:[0,4,7,11,12,7,4,11,0,4,7,12,11,7,4,2],texture:[0,4,7,11,0,4,7,9,0,3,7,10,0,3,7,12],acid:[0,0,7,0,12,7,3,0,0,7,5,3,12,10,7,3]};
-function freshSteps(type){return Array.from({length:64},(_,i)=>({on:type==='texture'?i%8===0:type==='poly'?i%4===0:[0,2,3,6,8,11,12,14].includes(i%16),note:templates[type][i%16],accent:i%8===0,slide:type==='acid'&&[3,11,14].includes(i%16),gate:.7,repeats:1,chord:[0],inversion:0}));}
+function freshSteps(){return Array.from({length:64},()=>({on:false,note:0,accent:false,slide:false,gate:.7,repeats:1,chord:[0],inversion:0}));}
 function en(g,t,attack,decay,sustain,release,dur,level=1){const a=.002+attack*1.3,d=.025+decay*2.1,r=.03+release*3.2,gate=Math.max(.08,dur);g.setValueAtTime(.0001,t);g.linearRampToValueAtTime(level,t+a);g.setTargetAtTime(Math.max(.0001,sustain*level),t+a,Math.max(.01,d/3));g.setTargetAtTime(.0001,t+gate,Math.max(.01,r/3));return t+gate+r*3}
 function stage(g,t,a,d,s,r,len,level=1){const at=.003+a*a*1.8,dc=.025+d*d*2,rt=.035+r*r*4,gate=Math.max(.005,len),sustain=Math.max(.0001,s*level);g.setValueAtTime(.0001,t);
  if(gate<=at)g.linearRampToValueAtTime(Math.max(.0001,level*gate/at),t+gate);
@@ -362,7 +361,8 @@ function makePolyPanel(cfg,p){
  </div><div class="jp-panel-note"><span>POLY-01 <b>VIRTUAL ANALOG SYNTHESIZER</b></span><span>DRAG KNOBS · SHIFT FOR FINE · DOUBLE-CLICK TO RESET</span></div>`;
 }
 export function createRackInstrument(mount,type,{externalClock=false,tempo=()=>126,getContext=null,getDestination=null}={}){
- if(!CONFIG[type])throw Error('Unknown rack module');const cfg=CONFIG[type],p={...cfg.preset},state={p,steps:16,pattern:0,patterns:Array.from({length:8},()=>freshSteps(type)),root:type==='texture'?48:type==='poly'?60:36,polyArp:type==='poly'?newPolyArp():null,polyMod:type==='poly'?{routes:[],rates:clawPatchbay.ratesSafe()}:null,patchRoutes:type==='texture'?BUCHLA_DEFAULT_ROUTES():null,active:true};let ctx=null,engine=null,running=false,interval=null,position=0,next=0,selected=0,history=[],currentPreset='',status='',lastSeq=-1;
+ if(!CONFIG[type])throw Error('Unknown rack module');const cfg=CONFIG[type],p={...cfg.preset},state={p,steps:16,pattern:0,patterns:Array.from({length:8},()=>freshSteps()),root:type==='texture'?48:type==='poly'?60:36,polyArp:type==='poly'?newPolyArp():null,polyMod:type==='poly'?{routes:[],rates:clawPatchbay.ratesSafe()}:null,patchRoutes:type==='texture'?BUCHLA_DEFAULT_ROUTES():null,active:true};let ctx=null,engine=null,running=false,interval=null,position=0,next=0,selected=0,history=[],currentPreset='',status='',lastSeq=-1;
+ if(type==='poly')state.polyArp.cells.forEach(cell=>cell.on=false);
  const $=sel=>mount.querySelector(sel),$$=sel=>[...mount.querySelectorAll(sel)],presets=INSTRUMENT_PRESETS[type];
  const title=type==='poly'?'POLY-01':type==='texture'?'μQ · MUTATION LAB':'BASS LINE · 303';
  const pSelect=presets.map((x,i)=>`<option value="${i}">${x[0]}</option>`).join('');

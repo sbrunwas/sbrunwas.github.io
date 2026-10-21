@@ -80,9 +80,8 @@ const hz=(n)=>440*Math.pow(2,(n-69)/12);
 const exp=(norm,min,max)=>min*Math.pow(max/min,Math.max(0,Math.min(1,norm)));
 const deepCopy=x=>JSON.parse(JSON.stringify(x));
 export function createInitialBassState(){
-  const step=(i,variant=0)=>({note:[0,0,7,0,12,7,3,0,0,7,5,3,12,10,7,3][i%16]+(variant%3)*2,
-  on:[0,2,3,4,6,7,8,10,11,12,14,15].includes(i%16),accent:[0,4,8,12].includes(i%16),slide:[3,7,11,15].includes(i%16),gate:.74,repeats:1});
-  return {params:{...BASE},bpm:126,root:36,steps:16,pattern:0,page:0,patterns:Array.from({length:8},(_,p)=>Array.from({length:64},(_,i)=>step(i,p))),active:true,sceneA:null,sceneB:null,morph:0};
+  const step=()=>({note:0,on:false,accent:false,slide:false,gate:.74,repeats:1});
+  return {params:{...BASE},bpm:126,root:36,steps:16,pattern:0,page:0,patterns:Array.from({length:8},()=>Array.from({length:64},()=>step())),active:true,sceneA:null,sceneB:null,morph:0};
 }
 const WAVES={};
 export class Bass01Engine{
