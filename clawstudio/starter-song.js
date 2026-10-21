@@ -44,20 +44,20 @@ function silenceDrumPattern(pattern,type,sceneIndex){
 const bassPositions=[0,3,6,8,11,14];
 const bassMotion=[0,0,7,0,3,7];
 function bassPattern(steps,scene){
- for(let i=0;i<64;i++){const s=steps[i];s.on=false;s.accent=false;s.slide=false;s.gate=.55;s.note=0}
+ for(let i=0;i<64;i++){const s=steps[i];s.repeats=1;s.chord=[0];s.inversion=0;s.on=false;s.accent=false;s.slide=false;s.gate=.55;s.note=0}
  for(let j=0;j<bassPositions.length;j++){const idx=bassPositions[j],s=steps[idx];s.on=true;s.note=bassMotion[j]==3?(scene.degree===0?3:4):bassMotion[j];s.gate=j===3?.75:.56;s.accent=j===0||j===3;s.slide=false}
 }
 function acidPattern(steps,scene){
- for(let i=0;i<64;i++){const s=steps[i];s.on=false;s.accent=false;s.slide=false;s.gate=.45;s.note=0}
+ for(let i=0;i<64;i++){const s=steps[i];s.repeats=1;s.chord=[0];s.inversion=0;s.on=false;s.accent=false;s.slide=false;s.gate=.45;s.note=0}
  const hits=[2,5,6,10,13,15],offset=[0,3,7,0,5,7];
  for(let j=0;j<hits.length;j++){const s=steps[hits[j]];s.on=true;s.note=offset[j]===3&&scene.degree!==0?4:offset[j];s.accent=j===0||j===4;s.slide=j===1||j===4;s.gate=.52}
 }
 function texturePattern(steps){
- for(let i=0;i<64;i++){const s=steps[i];s.on=false;s.accent=false;s.slide=false;s.gate=.65;s.note=0}
+ for(let i=0;i<64;i++){const s=steps[i];s.repeats=1;s.chord=[0];s.inversion=0;s.on=false;s.accent=false;s.slide=false;s.gate=.65;s.note=0}
  steps[0].on=true;steps[0].gate=1;
 }
 function polyPattern(steps,scene){
- for(let i=0;i<64;i++){const s=steps[i];s.on=false;s.slide=false;s.accent=false;s.gate=.6;s.note=0}
+ for(let i=0;i<64;i++){const s=steps[i];s.repeats=1;s.chord=[0];s.inversion=0;s.on=false;s.slide=false;s.accent=false;s.gate=.6;s.note=0}
  // The scale-aware JP arpeggiator is authoritative; its rest grid supplies air.
  for(const i of [0,4,8,12]){steps[i].on=true;steps[i].note=scene.degree===0?0:4}
 }

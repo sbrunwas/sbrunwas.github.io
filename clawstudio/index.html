@@ -103,12 +103,12 @@
 
 .cs10-plots .cs10-stereo{display:none}@media(min-width:1100px){.cs10-plots{grid-template-columns:1fr 1fr 160px}.cs10-plots .cs10-stereo{display:block}}
 </style><script type="module">
-import {createRackInstrument} from "./rack-devices.js?v=slow-coarse-20261020";
+import {createRackInstrument} from "./rack-devices.js?v=shared-seq-20261021";
 import {createSamplerRack} from "./sampler.js";
 import {createKickSidechain,kickAtStep,sidechainTiming} from "./sidechain.js";
 import {HARMONY_DEFAULTS,mountHarmonyPanel,linkHarmony,normalizeHarmony} from "./harmony.js";
 import {validateProject,saveLocalProject,loadLocalProject,projectBlob} from "./project-session.js";
-import {STARTER_TITLE,installStarterPatterns,buildStarterArrangement} from "./starter-song.js";
+import {STARTER_TITLE,installStarterPatterns,buildStarterArrangement} from "./starter-song.js?v=shared-seq-20261021";
 import {createMasterPerformanceFX} from "./master-performance.js";
 const {createConductor}=(()=>{
 // ClawStudio Performance Conductor v0.10 — scenes, 4-track step sequencer,
@@ -194,7 +194,7 @@ return {createConductor};
 })();
 import {AfterglowAudio} from "./audio.js";
 import {validateState,validateSamples} from "./state.js";
-import {createBass01} from "./bass01.js?v=slow-coarse-20261020";
+import {createBass01} from "./bass01.js?v=shared-seq-20261021";
 (()=>{
 const root=document.getElementById('clawstudio-root');if(root.dataset.loaded)return;root.dataset.loaded='1';
 const $=id=>root.querySelector('#'+id), all=q=>[...root.querySelectorAll(q)],clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
@@ -448,7 +448,7 @@ async function play(){
 }
 function pause(){
   playSerial++;playPending=false;playing=false;stopClock();
-  kickSidechain.reset();drumAudio?.pause();extraRacks.acid.getEngine()?.stop();
+  kickSidechain.reset();drumAudio?.pause();bass01.stop();for(const module of Object.values(extraRacks))module.stop();
   $('c-play').textContent='▶ JAM';
 }
 function stop(){pause();masterPerformance.stop();step=0;observedKickPattern=null;conductor?.reset();sampler.stop();drumAudio?.stop();all('#c-grid .step').forEach(x=>x.classList.remove('now'))}

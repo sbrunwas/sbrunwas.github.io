@@ -1,0 +1,68 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Shared note sequencing and editing for the four synthesis racks.
+export const LENGTHS=[4,8,16,32,48,64];
+export const CHORDS=Object.freeze({SINGLE:[0],MAJOR:[0,4,7],MINOR:[0,3,7],DIMINISHED:[0,3,6],AUGMENTED:[0,4,8],SUS2:[0,2,7],SUS4:[0,5,7],POWER:[0,7],MAJ7:[0,4,7,11],MIN7:[0,3,7,10],DOM7:[0,4,7,10]});
+const clamp=(v,a,b,fallback=a)=>Math.max(a,Math.min(b,Number.isFinite(Number(v))?Number(v):fallback));
+export const midiName=n=>['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'][n%12]+(Math.floor(n/12)-1);
+export function normalizeStep(step={}){
+ const s=step&&typeof step==='object'?step:{};
+ s.on=Boolean(s.on);s.note=Math.round(clamp(s.note,-127,127,0));s.accent=Boolean(s.accent);s.slide=Boolean(s.slide);s.gate=clamp(s.gate,.1,1,.7);s.repeats=Math.round(clamp(s.repeats,1,4,1));
+ s.chord=Array.isArray(s.chord)&&s.chord.length?[...new Set(s.chord.filter(Number.isFinite).map(n=>Math.round(clamp(n,-48,48))))].sort((a,b)=>a-b).slice(0,6):[0];if(!s.chord.length)s.chord=[0];
+ s.inversion=Math.round(clamp(s.inversion,0,s.chord.length-1,0));return s;
+}
+export function normalizeBank(state){
+ state.root=Math.round(clamp(state.root,0,127,48));state.pattern=Math.round(clamp(state.pattern,0,7,0));if(!LENGTHS.includes(state.steps))state.steps=16;
+ if(!Array.isArray(state.patterns))state.patterns=[];
+ for(let p=0;p<8;p++){if(!Array.isArray(state.patterns[p]))state.patterns[p]=[];for(let i=0;i<64;i++)state.patterns[p][i]=normalizeStep(state.patterns[p][i])}
+}
+export function chordNotes(step,root,poly=false){const s=normalizeStep(step),notes=poly?[...s.chord]:[0];if(poly)for(let i=0;i<s.inversion;i++){let moved=notes.shift()+12;while(notes.length&&moved<=notes.at(-1))moved+=12;notes.push(moved)}
+ return [...new Set(notes.map(offset=>root+s.note+offset).filter(n=>n>=0&&n<=127))].sort((a,b)=>a-b);
+}
+export function eventsForStep(state,index,time,duration,{poly=false}={}){
+ const i=((index%state.steps)+state.steps)%state.steps,pattern=state.patterns[state.pattern],step=normalizeStep(pattern[i]);if(!step.on)return [];
+ const previous=normalizeStep(pattern[(i+state.steps-1)%state.steps]),next=normalizeStep(pattern[(i+1)%state.steps]),unit=duration/step.repeats,notes=chordNotes(step,state.root,poly),events=[];
+ for(let repeat=0;repeat<step.repeats;repeat++)for(const note of notes)events.push({note,time:time+repeat*unit,length:Math.max(.004,unit*step.gate),interval:unit,velocity:step.accent?1:.72,accent:step.accent,fromPrevious:repeat===0&&previous.on&&previous.slide,holdNext:repeat===step.repeats-1&&step.slide&&next.on});
+ return events;
+}
+export function chordFromText(text,root){
+ const tokens=text.trim().split(/[\s,]+/).filter(Boolean);if(!tokens.length||tokens.length>6)throw Error('Enter 1–6 notes, such as C4 E4 G4 or 60 64 67.');
+ const notes=tokens.map(token=>{if(/^\d+$/.test(token)){const n=Number(token);if(n<=127)return n}const m=/^([A-Ga-g])([#♯b♭]?)(-?\d)$/.exec(token);if(!m)throw Error('Use note names with octaves (C4 E4 G4) or MIDI numbers (60 64 67).');const n=({C:0,D:2,E:4,F:5,G:7,A:9,B:11})[m[1].toUpperCase()]+(m[2]==='#'||m[2]==='♯'?1:m[2]==='b'||m[2]==='♭'?-1:0)+(Number(m[3])+1)*12;if(n<0||n>127)throw Error('Notes must be between MIDI 0 and 127.');return n});
+ const offsets=[...new Set(notes)].sort((a,b)=>a-b).map(n=>n-root);if(offsets.some(n=>n< -48||n>48))throw Error('Chord notes must be within four octaves of the step root.');return offsets;
+}
+export function attachStepSequencer(host,state,{type,prefix,onChange=()=>{},onSelect=()=>{}}){
+ normalizeBank(state);host.classList.add('shared-sequencer');host.dataset.instrument=type;
+ if(!document.querySelector('link[data-step-sequencer-style]')){const link=document.createElement('link');link.rel='stylesheet';link.href=new URL('./step-sequencer.css?v=shared-seq-20261021',import.meta.url).href;link.dataset.stepSequencerStyle='';document.head.append(link)}
+ const mono=type==='mono',poly=type==='poly',ids={pattern:prefix+'-pattern',length:prefix+(mono?'-count':'-length'),root:prefix+'-root',note:prefix+'-note',gate:prefix+'-gate',on:prefix+(mono?'-on':'-step-on'),accent:prefix+'-accent',slide:prefix+'-slide',selected:prefix+'-selected',random:prefix+(mono?'-random':'-stepsrnd'),save:prefix+'-save',load:prefix+'-load',file:prefix+(mono?'-file':'-loadfile'),status:mono?'b01-status':'seq-status'};
+ const options=(values,label=x=>x)=>values.map(n=>`<option value="${n}">${label(n)}</option>`).join('');
+ host.innerHTML=`<header class="seq-header"><div><strong>STEP SEQUENCER</strong><small>16-STEP ROWS · NOTES / ACCENTS / SUBDIVISIONS${poly?' / CHORDS':''}</small></div><div class="seq-toolbar"><label>PATTERN<select id="${ids.pattern}">${options([0,1,2,3,4,5,6,7],n=>String(n+1).padStart(2,'0'))}</select></label><label>STEPS<select id="${ids.length}">${options(LENGTHS)}</select></label><label>ROOT<select id="${ids.root}">${options(Array.from({length:128},(_,i)=>i),midiName)}</select></label>${poly?'<label>PLAYBACK<select data-seq-mode><option value="steps">STEP SEQUENCER</option><option value="arp">ARPEGGIATOR</option></select></label>':''}<label>GROOVE<select id="${prefix}-groove" data-seq-groove><option value="KEEP">CUSTOM</option><option value="DOTTED">DOTTED 8TH</option><option value="OFFBEAT">OFFBEAT</option><option value="DRIVE">16TH DRIVE</option><option value="SPARSE">SPARSE</option><option value="SYNC">SYNCOPATED</option></select></label><button type="button" id="${ids.random}">RND NOTES</button><button type="button" id="${prefix}-clear" data-seq-clear>CLEAR PATTERN</button></div></header>
+ <div class="seq-mode-message" role="status"></div><div class="seq-rows" aria-label="${type} sequencer steps"></div><section class="seq-editor" aria-label="Selected step editor"><strong>STEP <span id="${ids.selected}">01</span></strong><label>${poly?'ROOT NOTE':'NOTE'}<select id="${ids.note}"></select></label><button type="button" id="${ids.on}">GATE</button><button type="button" id="${ids.accent}">ACCENT</button><button type="button" id="${ids.slide}">${mono||type==='acid'?'SLIDE':'OVERLAP'}</button><label>HITS / STEP<select data-seq-repeats>${options([1,2,3,4],n=>({1:'1 · SINGLE',2:'2 · DOUBLE',3:'3 · TRIPLET',4:'4 · QUADRUPLET'})[n])}</select></label><label>GATE LENGTH<input id="${ids.gate}" type="range" min=".1" max="1" step=".01"></label></section>
+ ${poly?`<section class="seq-chord" aria-label="Step chord editor"><label>CHORD<select data-seq-chord>${options(Object.keys(CHORDS))}<option value="CUSTOM">CUSTOM</option></select></label><label>INVERSION<select data-seq-inversion></select></label><label class="seq-custom-notes">NOTES<input data-seq-notes type="text" placeholder="C4 E4 G4" aria-label="Chord notes for selected step" spellcheck="false"></label><span class="seq-chord-message" role="status"></span></section>`:''}
+ <footer class="seq-footer"><span id="${ids.status}">Tap a step to select; tap again to toggle. Shift/right-click selects without toggling.</span><div><button type="button" id="${ids.save}">SAVE PATCH</button><button type="button" id="${ids.load}">LOAD PATCH</button><input type="file" id="${ids.file}" accept=".json" hidden></div></footer>`;
+ const $=s=>host.querySelector(s),id=k=>$('#'+ids[k]);let selected=0,playing=-1;const timers=new Set();
+ const current=()=>normalizeStep(state.patterns[state.pattern][selected]);
+ function changed(){onChange();refresh()}
+ function select(index){selected=Math.max(0,Math.min(state.steps-1,index));onSelect(selected)}
+ function refresh(){normalizeBank(state);select(selected);const step=current();id('pattern').value=state.pattern;id('length').value=state.steps;id('root').value=state.root;id('selected').textContent=String(selected+1).padStart(2,'0');
+  const arp=poly&&state.polyArp?.enabled;if(poly)$('[data-seq-mode]').value=arp?'arp':'steps';$('.seq-mode-message').textContent=arp?'ARPEGGIATOR is playing. Choose STEP SEQUENCER above to hear the notes below.':'';
+  const rows=$('.seq-rows');rows.replaceChildren();
+  for(let start=0;start<state.steps;start+=16){const row=document.createElement('section');row.className='seq-row';if(state.steps<=8)row.style.minWidth='0';row.setAttribute('aria-label',`Steps ${start+1}–${Math.min(start+16,state.steps)}`);const range=document.createElement('span');range.className='seq-range';range.textContent=`${String(start+1).padStart(2,'0')}–${String(Math.min(start+16,state.steps)).padStart(2,'0')}`;const grid=document.createElement('div');grid.className='seq-grid';grid.style.setProperty('--seq-cols',Math.min(16,state.steps-start));
+   for(let i=start;i<Math.min(start+16,state.steps);i++){const s=state.patterns[state.pattern][i],notes=chordNotes(s,state.root,poly);const button=document.createElement('button');button.type='button';button.className='seq-step'+(s.on?' is-on':'')+(i===selected?' is-selected':'')+(i===playing?' is-playing':'');button.dataset.step=i;button.setAttribute('aria-label',`Step ${i+1}, ${notes.map(midiName).join(' ')}, ${s.on?'on':'off'}${s.accent?', accent':''}, ${s.repeats} hits`);button.setAttribute('aria-pressed',String(s.on));
+    const number=document.createElement('span');number.textContent=String(i+1).padStart(2,'0');const pitch=document.createElement('strong');pitch.textContent=notes.map(midiName).join(' ');const flags=document.createElement('small');flags.textContent=(s.accent?'▲ ':'')+(s.slide?'↗ ':'')+(s.repeats>1?`${s.repeats}×`:'');button.append(number,pitch,flags);
+    button.onclick=e=>{if(!e.shiftKey&&selected===i)s.on=!s.on;select(i);changed()};button.oncontextmenu=e=>{e.preventDefault();select(i);refresh()};button.onkeydown=e=>{const offset=({ArrowLeft:-1,ArrowRight:1,ArrowUp:-16,ArrowDown:16})[e.key];if(offset){e.preventDefault();select(selected+offset);refresh();$(`[data-step="${selected}"]`).focus()}};grid.append(button);
+   }row.append(range,grid);rows.append(row);
+  }
+  id('note').innerHTML=options(Array.from({length:128},(_,i)=>i-state.root),n=>midiName(state.root+n));id('note').value=step.note;id('gate').value=step.gate;$('[data-seq-repeats]').value=step.repeats;
+  for(const [key,field] of [['on','on'],['accent','accent'],['slide','slide']]){id(key).classList.toggle('is-active',step[field]);id(key).setAttribute('aria-pressed',String(step[field]))}
+  if(poly){const preset=Object.entries(CHORDS).find(([,offsets])=>JSON.stringify(offsets)===JSON.stringify(step.chord));$('[data-seq-chord]').value=preset?preset[0]:'CUSTOM';$('[data-seq-inversion]').innerHTML=options(Array.from({length:step.chord.length},(_,i)=>i),n=>n===0?'ROOT POSITION':`${n} · INVERSION`);$('[data-seq-inversion]').value=step.inversion;const input=$('[data-seq-notes]');input.value=chordNotes(step,state.root,true).map(midiName).join(' ');input.removeAttribute('aria-invalid');$('.seq-chord-message').textContent='Up to six notes; use names (C4 E4 G4) or MIDI numbers.'}
+ }
+ id('pattern').onchange=e=>{state.pattern=Number(e.target.value);select(0);changed()};id('length').onchange=e=>{state.steps=Number(e.target.value);select(Math.min(selected,state.steps-1));changed()};id('root').onchange=e=>{state.root=Number(e.target.value);changed()};
+ id('note').onchange=e=>{current().note=Number(e.target.value);current().on=true;changed()};id('gate').oninput=e=>{current().gate=Number(e.target.value);onChange()};$('[data-seq-repeats]').onchange=e=>{current().repeats=Number(e.target.value);changed()};
+ for(const key of ['on','accent','slide'])id(key).onclick=()=>{const s=current();s[key]=!s[key];changed()};
+ $('[data-seq-groove]').onchange=e=>{const kind=e.target.value;if(kind==='KEEP')return;for(let i=0;i<state.steps;i++){const s=state.patterns[state.pattern][i];s.on=kind==='DOTTED'?i%3===0:kind==='OFFBEAT'?i%4===2:kind==='DRIVE'?i%2===0:kind==='SPARSE'?i%8===0:[0,3,7,10,14].includes(i%16);s.accent=kind==='DOTTED'?i%12===0:i%4===0;s.slide=false;s.repeats=1;s.gate=kind==='DOTTED'?.39:kind==='DRIVE'?.54:.66;s.note=[0,0,7,0,12,7,3,0,0,7,5,3,12,10,7,3][i%16]}changed()};
+ id('random').onclick=()=>{for(let i=0;i<state.steps;i++){const s=state.patterns[state.pattern][i];s.note=[0,0,3,5,7,10,12,15][Math.floor(Math.random()*8)];s.on=Math.random()>.35;s.accent=Math.random()<.2;s.slide=false}changed()};$('[data-seq-clear]').onclick=()=>{state.patterns[state.pattern].forEach(s=>s.on=false);changed()};
+ if(poly){$('[data-seq-mode]').onchange=e=>{state.polyArp.enabled=e.target.value==='arp';changed()};$('[data-seq-chord]').onchange=e=>{if(CHORDS[e.target.value]){current().chord=[...CHORDS[e.target.value]];current().inversion=0;current().on=true;changed()}};$('[data-seq-inversion]').onchange=e=>{current().inversion=Number(e.target.value);changed()};$('[data-seq-notes]').onchange=e=>{try{const step=current();if(e.target.value.trim()===chordNotes(step,state.root,true).map(midiName).join(' ')){refresh();return}step.chord=chordFromText(e.target.value,state.root+step.note);step.inversion=0;step.on=true;changed()}catch(error){e.target.setAttribute('aria-invalid','true');$('.seq-chord-message').textContent=error.message}}}
+ function showPlayhead(index){playing=index;host.querySelectorAll('[data-step]').forEach(button=>button.classList.toggle('is-playing',Number(button.dataset.step)===index))}
+ function playhead(index,time,ctx){const delay=ctx?Math.max(0,(time-ctx.currentTime)*1000):0;if(delay<2){showPlayhead(index);return}const timer=setTimeout(()=>{timers.delete(timer);if(host.isConnected)showPlayhead(index)},delay);timers.add(timer)}
+ function stop(){for(const timer of timers)clearTimeout(timer);timers.clear();showPlayhead(-1)}
+ refresh();return {refresh,playhead,stop,get selected(){return selected}};
+}
