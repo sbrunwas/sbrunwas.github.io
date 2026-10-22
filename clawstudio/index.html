@@ -59,10 +59,12 @@
 .claw .cs17-project b{color:#e2c590;font-size:10px;letter-spacing:1px}.claw .cs17-project small{display:block;font-size:10px;color:#bdd1bd;margin-top:3px}
 .claw .cs17-actions{display:flex;flex-wrap:wrap;gap:5px}.claw .cs17-actions button{background:#304f41;border-color:#70977d;font-size:10px;font-weight:750;min-height:31px}
 .claw #cs17-save-project{background:#b5d09b;color:#1b3525}.claw #cs17-restore{border-color:#a7c9a2}
+.claw #c-master-color{padding:6px;background:#162b20;color:#dae7d4;border:1px solid #6d8876;border-radius:3px;margin:8px 0}
 .claw .song-library{display:flex;align-items:center;flex-wrap:wrap;gap:9px;padding:11px 13px;background:#20362a;border-bottom:1px solid #557466}.claw .song-library label{display:flex;flex-direction:column;gap:4px;font-size:8px;letter-spacing:.1em;color:#bdd1bd}.claw .song-library select,.claw .song-library input{min-height:33px;background:#14251a;color:#e6f1e5;border:1px solid #70977d;border-radius:3px;padding:6px 8px}.claw .song-library select{max-width:310px}.claw .song-library .song-title{flex:1;min-width:130px}.claw .song-library input{width:100%;box-sizing:border-box}.claw .song-library button{min-height:33px;font-size:10px;font-weight:800;align-self:flex-end}.claw #c-song-save{background:#b5d09b;color:#1b3525}.claw .song-library small{flex-basis:100%;font-size:10px;color:#bdd1bd}.claw .song-library button:disabled{opacity:.5;cursor:wait}
 </style>
-<div class="head"><div><div class="brand">CLAW<em>STUDIO</em></div><div class="small">RACK + PERFORMANCE DESK · v0.19 · MASTER PERFORMANCE FX</div></div><div class="transport"><button id="c-play" class="onair">▶ JAM</button><button id="c-stop">■ STOP</button><span class="small">BPM</span><input id="c-bpm" type="number" min="60" max="180" value="126"><button id="c-rec">● REC</button><button type="button" class="claw-mute-all" aria-pressed="false" title="Mute every mixer channel; unmute strips individually">■ MUTE ALL</button></div></div>
+<div class="head"><div><div class="brand">CLAW<em>STUDIO</em></div><div class="small">RACK + PERFORMANCE DESK · v0.19 · MASTER PERFORMANCE FX</div></div><div class="transport"><button id="c-play" class="onair">▶ JAM</button><button id="c-stop">■ STOP</button><span class="small">BPM</span><input id="c-bpm" type="number" min="60" max="180" value="124"><button id="c-rec">● REC</button><button type="button" class="claw-mute-all" aria-pressed="false" title="Mute every mixer channel; unmute strips individually">■ MUTE ALL</button></div></div>
 <div class="song-library"><label>SONG<select id="c-song-picker" aria-label="Song library"><option value="blank">NEW / BLANK SONG</option><option value="factory">BLUE HOUR · DEMO</option></select></label><button type="button" id="c-song-load">LOAD SONG</button><button type="button" id="c-song-new">NEW SONG</button><label class="song-title">NAME<input id="c-song-name" maxlength="64" placeholder="Untitled" aria-label="Song name"></label><button type="button" id="c-song-save">SAVE SONG</button><small id="c-song-status" role="status">Blank patterns · songs are saved in this browser</small></div>
+<link rel="stylesheet" href="./keyboard-jam.css?v=keyboard-jam-20261022"><div id="c-keyboard-host"></div>
 <div class="nav"><button id="c-racktab" class="active">▦ RACK</button><button id="c-desktab">▤ DESK</button><span class="engine" id="c-engine">DRUM MACHINE · LOCAL ENGINE</span></div>
 <div class="cs17-project"><div><b>PROJECT MEMORY</b><small id="cs17-project-status">Sampler reels need a backup · browser recovery is local to this device</small></div><div class="cs17-actions"><button type="button" id="cs17-save-project">↓ SAVE PROJECT</button><button type="button" id="cs17-backup">▣ BACKUP IN BROWSER</button><button type="button" id="cs17-restore">↶ RESTORE BACKUP</button><button type="button" id="cs17-load-project">↑ OPEN PROJECT</button><input id="cs17-project-file" type="file" accept=".json,application/json" hidden></div></div>
 <div class="view current" id="c-rack">
@@ -80,10 +82,10 @@
 </section>
 <section class="device inspector"><div class="devtitle" id="c-step-title">STEP INSPECTOR · 01</div><div class="inspectline"><button id="c-step-on">STEP ON</button><span id="c-step-target">KICK · 01</span></div><div class="rack-dials" id="c-stepknobs"></div><p class="tapehelp">Velocity, chance and repeats apply only to the selected step. Shift-tap, right-click, or long-press a sequencer key to inspect it without toggling.</p></section>
 </div>
-<div class="rackfoot"><button id="c-kit-save">SAVE KIT</button><button id="c-kit-load">LOAD KIT</button><input id="c-kit-file" type="file" accept=".json" style="display:none"><button id="c-copy">COPY PATTERN</button><button id="c-paste">PASTE PATTERN</button><button id="c-chainmode">SONG CHAIN: OFF</button><input id="c-chain" value="1, 2, 3, 4" aria-label="Pattern chain"><button id="c-chainapply">APPLY</button><span class="small">16 patterns · 11 lanes · 808 / 909 / Linn / Perkons / Sample · local drum engine</span><button id="c-mixnow">MIX AT DESK →</button></div>
+<div class="rackfoot"><button id="c-clean-drums" title="Neutral drum EQ/filter, no drum sends, clean master, bypassed glitch FX and no master heat; patterns and chosen drum sounds stay intact">CLEAN AFTERGLOW SOUND</button><button id="c-kit-save">SAVE KIT</button><button id="c-kit-load">LOAD KIT</button><input id="c-kit-file" type="file" accept=".json" style="display:none"><button id="c-copy">COPY PATTERN</button><button id="c-paste">PASTE PATTERN</button><button id="c-chainmode">SONG CHAIN: OFF</button><input id="c-chain" value="1, 2, 3, 4" aria-label="Pattern chain"><button id="c-chainapply">APPLY</button><span class="small">16 patterns · 11 lanes · 808 / 909 / Linn / Perkons / Sample · local drum engine</span><button id="c-mixnow">MIX AT DESK →</button></div>
 </div>
 <div id="c-bass-pane" style="display:none"><div id="c-bass-mount"></div></div><div id="c-poly-pane" style="display:none"><div id="c-poly-mount"></div></div><div id="c-texture-pane" style="display:none"><div id="c-texture-mount"></div></div><div id="c-acid-pane" style="display:none"><div id="c-acid-mount"></div></div><div id="c-sampler-pane" style="display:none"><div id="c-sampler-mount"></div></div></div>
-<div class="view" id="c-desk"><div id="cs10-scene-host"></div><div id="cs17-harmony-host"></div><div id="cs10-analysis-host"></div><div class="topline"><span class="secttitle">PERFORMANCE DESK</span><div class="claw-desk-actions"><span class="small">7 CHANNELS · EQ / VCF / SENDS / MIX</span><button type="button" class="claw-mute-all" aria-pressed="false">■ MUTE ALL</button></div></div><div class="strips" id="c-strips"></div><div id="cs10-seq-host"></div><div class="fxrow"><section class="fxpanel"><div class="sec" style="border:0;margin:0">OUTBOARD FX · DUB / SPACE / HEAT</div><div class="fxknobs" id="c-fx"></div></section><section class="fxpanel sc-panel"><div class="sec" style="border:0;margin:0">KICK SIDECHAIN / PUMP</div><div class="fxknobs" id="c-sidechain"></div><p class="sc-note"><strong id="c-sc-count">0 CHANNELS</strong> · Enable KICK SC on a mixer strip. Drum Machine kick steps trigger the ducking envelope.</p></section><section class="fxpanel"><div class="sec" style="border:0;margin:0">MASTER / RESAMPLING</div><div class="part">Create a groove in Rack, perform the Desk, and capture any instrument, deck bus or master directly into SAMPLER-01. Audio stays running when changing tabs.</div><p class="part">A/B morph changes filter, EQ and send parameters; channel faders remain independent.</p></section></div><div id="cs19-master-fx"></div><div id="cs10-io-host"></div><div class="morph"><div class="morphhead"><b>SCENE MORPH · A ↔ B</b><div class="scene"><button id="c-capa">CAPTURE A</button><button id="c-capb">CAPTURE B</button><button id="c-mode">MODE: MORPH</button></div></div><input class="morphbar" id="c-cross" type="range" min="0" max="100" value="0"><div class="ends"><span>A · GROOVE</span><span id="c-morphlabel">0% · 7 PARAMETERS</span><span>B · BREAKDOWN</span></div></div></div>
+<div class="view" id="c-desk"><div id="cs10-scene-host"></div><div id="cs17-harmony-host"></div><div id="cs10-analysis-host"></div><div class="topline"><span class="secttitle">PERFORMANCE DESK</span><div class="claw-desk-actions"><span class="small">7 CHANNELS · EQ / VCF / SENDS / MIX</span><button type="button" class="claw-mute-all" aria-pressed="false">■ MUTE ALL</button></div></div><div class="strips" id="c-strips"></div><div id="cs10-seq-host"></div><div class="fxrow"><section class="fxpanel"><div class="sec" style="border:0;margin:0">OUTBOARD FX · DUB / SPACE / HEAT</div><div class="fxknobs" id="c-fx"></div></section><section class="fxpanel sc-panel"><div class="sec" style="border:0;margin:0">KICK SIDECHAIN / PUMP</div><div class="fxknobs" id="c-sidechain"></div><p class="sc-note"><strong id="c-sc-count">0 CHANNELS</strong> · Enable KICK SC on a mixer strip. Drum Machine kick steps trigger the ducking envelope.</p></section><section class="fxpanel"><div class="sec" style="border:0;margin:0">MASTER / RESAMPLING</div><label class="part">MASTER SOUND <select id="c-master-color"><option value="CLEAN">CLEAN · TRANSIENTS</option><option value="GLUE">GLUE · COMPRESSION</option></select></label><div class="part">Create a groove in Rack, perform the Desk, and capture any instrument, deck bus or master directly into SAMPLER-01. Audio stays running when changing tabs.</div><p class="part">A/B morph changes filter, EQ and send parameters; channel faders remain independent.</p></section></div><div id="cs19-master-fx"></div><div id="cs10-io-host"></div><div class="morph"><div class="morphhead"><b>SCENE MORPH · A ↔ B</b><div class="scene"><button id="c-capa">CAPTURE A</button><button id="c-capb">CAPTURE B</button><button id="c-mode">MODE: MORPH</button></div></div><input class="morphbar" id="c-cross" type="range" min="0" max="100" value="0"><div class="ends"><span>A · GROOVE</span><span id="c-morphlabel">0% · 7 PARAMETERS</span><span>B · BREAKDOWN</span></div></div></div>
 <div class="footer"><span id="c-status">Start a jam in Rack, then switch to Desk. No timeline.</span></div>
 <link rel="stylesheet" href="./rack-devices.css?v=poly-voice-20261021"><style>/* ClawStudio performance instruments — responsive, tactile, no DAW timeline. */
 .cs10-scene-panel,.cs10-sequencer,.cs10-analysis,.cs10-io{margin:8px 0 12px;padding:12px;border:1px solid #61796b;border-radius:8px;background:linear-gradient(145deg,#263a31,#17281f);color:#e4e9d9}
@@ -105,14 +107,16 @@
 
 .cs10-plots .cs10-stereo{display:none}@media(min-width:1100px){.cs10-plots{grid-template-columns:1fr 1fr 160px}.cs10-plots .cs10-stereo{display:block}}
 </style><script type="module">
-import {normalizePolyVoice} from "./poly-voice.js?v=poly-voice-20261021";
-import {createRackInstrument} from "./rack-devices.js?v=poly-voice-20261021";
-import {createSamplerRack} from "./sampler.js";
+import {createStudioMaster,createStudioChannel,setChannelTone} from "./studio-mix.js?v=clean-drums-20261022";
+import {mountKeyboardJam} from "./keyboard-jam.js?v=keyboard-jam-20261022";
+import {normalizePolyVoice} from "./poly-voice.js?v=jam-studio-20261022";
+import {createRackInstrument} from "./rack-devices.js?v=jam-studio-20261022";
+import {createSamplerRack} from "./sampler.js?v=jam-studio-20261022";
 import {createKickSidechain,kickAtStep,sidechainTiming} from "./sidechain.js";
 import {HARMONY_DEFAULTS,mountHarmonyPanel,linkHarmony,normalizeHarmony} from "./harmony.js";
 import {validateProject,saveLocalProject,loadLocalProject,projectBlob,saveSong,listSongs,loadSong} from "./project-session.js?v=blank-song-library-20261021";
 import {STARTER_TITLE,installStarterPatterns,buildStarterArrangement} from "./starter-song.js?v=shared-seq-20261021";
-import {createMasterPerformanceFX} from "./master-performance.js";
+import {createMasterPerformanceFX} from "./master-performance.js?v=musical-transitions-20261022";
 const {createConductor}=(()=>{
 // ClawStudio Performance Conductor v0.10 — scenes, 4-track step sequencer,
 // Web MIDI I/O and actual master audio visualization. Original code AGPL-3.0-only.
@@ -194,18 +198,19 @@ return {createConductor};
 })();
 import {AfterglowAudio} from "./audio.js";
 import {validateState,validateSamples} from "./state.js";
-import {createBass01} from "./bass01.js?v=blank-song-library-20261021";
+import {createBass01} from "./bass01.js?v=jam-studio-20261022";
 (()=>{
 const root=document.getElementById('clawstudio-root');if(root.dataset.loaded)return;root.dataset.loaded='1';
 const $=id=>root.querySelector('#'+id), all=q=>[...root.querySelectorAll(q)],clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
 const names=['KICK','SNARE','LOW TOM','MID TOM','HIGH TOM','RIM','CLAP','CLOSED HAT','OPEN HAT','CRASH','RIDE'];
 const voice=Array.from({length:11},()=>({model:0,tune:0,decay:.5,tone:.5,level:.8,pan:0,drive:0,mute:false,solo:false,reverse:false,sampleStart:0,sampleEnd:1}));
-const patterns=Array.from({length:16},(_,p)=>({length:16,steps:Array.from({length:11},(_,v)=>Array.from({length:64},(_,s)=>({on:false,velocity:.85,probability:1,ratchets:1})))}));
-const drum={bank:{patterns,chain:Array.from({length:64},(_,i)=>i%16),chainLength:4},voices:voice,tempo:126,swing:.08,master:.8,masterDrive:0,selectedPattern:0,chainMode:false,randomEnginePool:[0,1,3,4]};
-let selected=0,selectedStep=0,page=0,clipboard=null,randomUndo=null,sampleSlots=Array(11).fill(null),playing=false,step=0,next=0,interval,ctx,noiseBuffer,drumAudio=null,drumInit=null,rec=false,recChunks=[],recTap=null,fxNodes=null,mode='morph',A={},B={},links=[],conductor=null;
+const patterns=Array.from({length:16},(_,p)=>({length:16,steps:Array.from({length:11},(_,v)=>Array.from({length:64},(_,s)=>({on:false,velocity:v===0?.95:v===7?(s%4===0?.65:.85):.85,probability:1,ratchets:1})))}));
+const drum={bank:{patterns,chain:Array.from({length:64},(_,i)=>i%16),chainLength:4},voices:voice,tempo:124,swing:.12,master:.75,masterDrive:0,selectedPattern:0,chainMode:false,randomEnginePool:[0,1,3,4]};
+let selected=0,selectedStep=0,page=0,clipboard=null,randomUndo=null,sampleSlots=Array(11).fill(null),playing=false,step=0,next=0,interval,ctx,noiseBuffer,drumAudio=null,drumInit=null,rec=false,recChunks=[],recTap=null,fxNodes=null,mode='morph',A={},B={},links=[],conductor=null,keyboardJam=null;
 const defs=[['drums','DRUM MACHINE','A','#d0b783'],['acid','MONO','B','#b0d7ba'],['poly','POLY','B','#809dd2'],['texture','TEXTURE','B','#e3d04b'],['tb303','ACID','A','#d0d1c9'],['sample','SAMPLER','A','#cfaed2'],['external','EXT IN','A','#a5b9aa']];
-const channels=Object.fromEntries(defs.map(([id,name,bus,color])=>[id,{id,name,bus,color,mute:false,solo:false,v:{hi:.5,hm:.5,lm:.5,low:.5,cut:1,res:0,delay:id==='acid'?0:.05,reverb:id==='acid'?0:id==='texture'?.35:.1,level:id==='external'?0:id==='drums'?.88:.6},sc:false,nodes:null}]));
-const fx={time:.35,feedback:.35,space:.55,drive:.14};
+let masterColor='CLEAN';
+const channels=Object.fromEntries(defs.map(([id,name,bus,color])=>[id,{id,name,bus,color,mute:false,solo:false,v:{hi:.5,hm:.5,lm:.5,low:.5,cut:1,res:0,delay:id==='acid'||id==='drums'?0:.05,reverb:id==='acid'||id==='drums'?0:id==='texture'?.35:.1,level:id==='external'?0:id==='drums'?1:.6},sc:false,nodes:null}]));
+const fx={time:.35,feedback:.35,space:.55,drive:0};
 const masterPerformance=createMasterPerformanceFX($('cs19-master-fx'),{getTempo:()=>drum.tempo,getNextBarTime:()=>playing?next+((16-step%16)%16)*(60/drum.tempo/4):ctx?.currentTime,status:msg=>{$('c-status').textContent=msg}});
 
 const harmonyState={...HARMONY_DEFAULTS};let harmonicPanel=null;
@@ -265,7 +270,7 @@ for(const [id,pane] of [['drums','c-drum-pane'],['acid','c-bass-pane'],['poly','
 }
 refreshMuteAllButtons();
 for(const [type,tab,pane] of [['drum','c-drum-select','c-drum-pane'],['bass','c-bass-select','c-bass-pane'],['poly','c-poly-select','c-poly-pane'],['texture','c-texture-select','c-texture-pane'],['acid','c-acid-select','c-acid-pane'],['sampler','c-sampler-select','c-sampler-pane']]){
- $(tab).onclick=()=>{for(const [,other,section] of [['drum','c-drum-select','c-drum-pane'],['bass','c-bass-select','c-bass-pane'],['poly','c-poly-select','c-poly-pane'],['texture','c-texture-select','c-texture-pane'],['acid','c-acid-select','c-acid-pane'],['sampler','c-sampler-select','c-sampler-pane']]){$(section).style.display=section===pane?'block':'none';$(other).classList.toggle('active',other===tab)}};
+ $(tab).onclick=()=>{keyboardJam?.setTarget(type);for(const [,other,section] of [['drum','c-drum-select','c-drum-pane'],['bass','c-bass-select','c-bass-pane'],['poly','c-poly-select','c-poly-pane'],['texture','c-texture-select','c-texture-pane'],['acid','c-acid-select','c-acid-pane'],['sampler','c-sampler-select','c-sampler-pane']]){$(section).style.display=section===pane?'block':'none';$(other).classList.toggle('active',other===tab)}};
 }
 const get=k=>{let [id,p]=k.split('.');return id==='fx'?fx[p]:id==='sc'?kickSidechain.params[p]:channels[id].v[p]};
 function set(k,v){let [id,p]=k.split('.');v=clamp(v);if(id==='fx'){fx[p]=v;applyFX()}else if(id==='sc'){kickSidechain.setParameter(p,v)}else{channels[id].v[p]=v;applyChannel(channels[id])}paint(k)}
@@ -333,11 +338,11 @@ el.querySelector('.mute').onclick=e=>{c.mute=!c.mute;e.target.classList.toggle('
 function current(){let o={};for(let c of Object.values(channels))for(let p of Object.keys(c.v))if(p!=='level')o[c.id+'.'+p]=c.v[p];for(let k in fx)o['fx.'+k]=fx[k];for(let k in kickSidechain.params)o['sc.'+k]=kickSidechain.params[k];return o}
 function morph(){let x=Number($('c-cross').value)/100;if(mode==='morph'){for(let k of links)set(k,A[k]+(B[k]-A[k])*x);if(ctx){fxNodes.busA.gain.setTargetAtTime(1,ctx.currentTime,.03);fxNodes.busB.gain.setTargetAtTime(1,ctx.currentTime,.03)}}else if(ctx){fxNodes.busA.gain.setTargetAtTime(Math.cos(x*Math.PI/2),ctx.currentTime,.03);fxNodes.busB.gain.setTargetAtTime(Math.sin(x*Math.PI/2),ctx.currentTime,.03)}$('c-morphlabel').textContent=Math.round(100*x)+'% · '+(mode==='morph'?links.length+' PARAMETERS':'AUDIO BLEND')}
 function capture(which){if(which==='A'){A=current();links=[];$('c-cross').value=0;$('c-status').textContent='Scene A captured. Tweak settings and capture B.'}else{B=current();links=Object.keys(A).filter(k=>Math.abs(A[k]-B[k])>.001);$('c-cross').value=100;$('c-status').textContent='Scene B captured · '+links.length+' parameters'}morph()}
-function setup(){if(ctx)return;let AC=window.AudioContext||window.webkitAudioContext;ctx=new AC({sampleRate:48000});noiseBuffer=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate);let dat=noiseBuffer.getChannelData(0);for(let i=0;i<dat.length;i++)dat[i]=Math.random()*2-1;let busA=ctx.createGain(),busB=ctx.createGain(),master=ctx.createGain(),drive=ctx.createWaveShaper(),compressor=ctx.createDynamicsCompressor(),meter=ctx.createAnalyser();busA.connect(master);busB.connect(master);masterPerformance.init(ctx,master,drive);drive.connect(compressor);compressor.connect(meter);meter.connect(ctx.destination);master.gain.value=.65;compressor.threshold.value=-9;compressor.ratio.value=3;let delay=ctx.createDelay(2),low=ctx.createBiquadFilter(),feed=ctx.createGain();delay.connect(low);low.type='lowpass';low.frequency.value=3600;low.connect(feed);feed.connect(delay);delay.connect(master);let convolver=ctx.createConvolver(),rv=ctx.createGain();convolver.connect(rv);rv.connect(master);let n=ctx.sampleRate*1.9,ir=ctx.createBuffer(2,n,ctx.sampleRate);for(let ch=0;ch<2;ch++){let a=ir.getChannelData(ch);for(let i=0;i<n;i++)a[i]=(Math.random()*2-1)*Math.pow(1-i/n,3)}convolver.buffer=ir;fxNodes={busA,busB,master,drive,delay,feed,rv,meter};
-for(let c of Object.values(channels)){let input=ctx.createGain(),prev=input,eq=[];for(let [type,f] of [['lowshelf',150],['peaking',500],['peaking',2100],['highshelf',8000]]){let b=ctx.createBiquadFilter();b.type=type;b.frequency.value=f;b.Q.value=.9;prev.connect(b);prev=b;eq.push(b)}let filter=ctx.createBiquadFilter(),gain=ctx.createGain(),an=ctx.createAnalyser(),sendD=ctx.createGain(),sendR=ctx.createGain();filter.type='lowpass';filter.frequency.value=19500;prev.connect(filter);filter.connect(gain);const duck=kickSidechain.connect(ctx,c.id);gain.connect(duck);duck.connect(an);an.connect(c.bus==='A'?busA:busB);duck.connect(sendD);sendD.connect(delay);duck.connect(sendR);sendR.connect(convolver);an.fftSize=256;c.nodes={input,eq,filter,gain,duck,an,sendD,sendR};kickSidechain.setEnabled(c.id,c.sc);applyChannel(c)}sampler.init();bass01.init(ctx,channels.acid.nodes.input);extraRacks.poly.init(ctx,channels.poly.nodes.input);extraRacks.texture.init(ctx,channels.texture.nodes.input);extraRacks.acid.init(ctx,channels.tb303.nodes.input);applyFX();conductor?.attachAnalyzers(ctx,meter);requestAnimationFrame(updateMeters)}
-function applyChannel(c){if(!ctx||!c.nodes)return;let t=ctx.currentTime,n=c.nodes,v=c.v;['low','lm','hm','hi'].forEach((p,i)=>n.eq[i].gain.setTargetAtTime((v[p]-.5)*24,t,.015));n.filter.frequency.setTargetAtTime(v.cut>.995?19500:80*Math.pow(190,v.cut),t,.02);n.filter.Q.setTargetAtTime(.5+v.res*12,t,.02);let solo=Object.values(channels).some(x=>x.solo);n.gain.gain.setTargetAtTime(c.mute||(solo&&!c.solo)?0:v.level,t,.025);n.sendD.gain.setTargetAtTime(v.delay,t,.03);n.sendR.gain.setTargetAtTime(v.reverb,t,.03)}
+function setup(){if(ctx)return;let AC=window.AudioContext||window.webkitAudioContext;ctx=new AC({sampleRate:48000});noiseBuffer=ctx.createBuffer(1,ctx.sampleRate,ctx.sampleRate);let dat=noiseBuffer.getChannelData(0);for(let i=0;i<dat.length;i++)dat[i]=Math.random()*2-1;let busA=ctx.createGain(),busB=ctx.createGain(),meter=ctx.createAnalyser(),masterBus=createStudioMaster(ctx,meter),{master,drive}=masterBus;busA.connect(master);busB.connect(master);masterPerformance.init(ctx,master,drive);meter.connect(ctx.destination);masterBus.setColor(masterColor);let delay=ctx.createDelay(2),low=ctx.createBiquadFilter(),feed=ctx.createGain();delay.connect(low);low.type='lowpass';low.frequency.value=3600;low.connect(feed);feed.connect(delay);delay.connect(master);let convolver=ctx.createConvolver(),rv=ctx.createGain();convolver.connect(rv);rv.connect(master);let n=ctx.sampleRate*1.9,ir=ctx.createBuffer(2,n,ctx.sampleRate);for(let ch=0;ch<2;ch++){let a=ir.getChannelData(ch);for(let i=0;i<n;i++)a[i]=(Math.random()*2-1)*Math.pow(1-i/n,3)}convolver.buffer=ir;fxNodes={busA,busB,master,drive,delay,feed,rv,meter,masterBus};
+for(let c of Object.values(channels)){const strip=createStudioChannel(ctx),{input,eq,filter,gain}=strip;let an=ctx.createAnalyser(),sendD=ctx.createGain(),sendR=ctx.createGain();const duck=kickSidechain.connect(ctx,c.id);gain.connect(duck);duck.connect(an);an.connect(c.bus==='A'?busA:busB);duck.connect(sendD);sendD.connect(delay);duck.connect(sendR);sendR.connect(convolver);an.fftSize=256;c.nodes={...strip,duck,an,sendD,sendR};kickSidechain.setEnabled(c.id,c.sc);applyChannel(c)}sampler.init();bass01.init(ctx,channels.acid.nodes.input);extraRacks.poly.init(ctx,channels.poly.nodes.input);extraRacks.texture.init(ctx,channels.texture.nodes.input);extraRacks.acid.init(ctx,channels.tb303.nodes.input);applyFX();conductor?.attachAnalyzers(ctx,meter);requestAnimationFrame(updateMeters)}
+function applyChannel(c){if(!ctx||!c.nodes)return;let t=ctx.currentTime,n=c.nodes,v=c.v;setChannelTone(n,v,t);let solo=Object.values(channels).some(x=>x.solo);n.gain.gain.setTargetAtTime(c.mute||(solo&&!c.solo)?0:v.level,t,.025);n.sendD.gain.setTargetAtTime(v.delay,t,.03);n.sendR.gain.setTargetAtTime(v.reverb,t,.03)}
 function gate(){for(let c of Object.values(channels))applyChannel(c)}
-function applyFX(){if(!ctx)return;let t=ctx.currentTime;fxNodes.delay.delayTime.setTargetAtTime(.09+fx.time*.65,t,.04);fxNodes.feed.gain.setTargetAtTime(fx.feedback*.86,t,.04);fxNodes.rv.gain.setTargetAtTime(fx.space*.7,t,.04);let curve=new Float32Array(1024),k=1+fx.drive*15;for(let i=0;i<curve.length;i++){let x=2*i/1023-1;curve[i]=Math.tanh(x*k)/Math.tanh(k)}fxNodes.drive.curve=curve}
+function applyFX(){if(!ctx)return;let t=ctx.currentTime;fxNodes.delay.delayTime.setTargetAtTime(.09+fx.time*.65,t,.04);fxNodes.feed.gain.setTargetAtTime(fx.feedback*.86,t,.04);fxNodes.rv.gain.setTargetAtTime(fx.space*.7,t,.04);fxNodes.masterBus.setDrive(fx.drive)}
 function env(when,length,amp){let g=ctx.createGain();g.gain.setValueAtTime(.0001,when);g.gain.exponentialRampToValueAtTime(Math.max(.001,amp),when+.006);g.gain.exponentialRampToValueAtTime(.0001,when+length);return g}
 function note(type,hz,when,length,target,amp){let o=ctx.createOscillator(),g=env(when,length,amp);o.type=type;o.frequency.setValueAtTime(hz,when);o.connect(g);g.connect(target);o.start(when);o.stop(when+length+.03);return o}
 function noise(target,when,length,amp,hp=1400){let src=ctx.createBufferSource(),filter=ctx.createBiquadFilter(),g=env(when,length,amp);src.buffer=noiseBuffer;filter.type='highpass';filter.frequency.value=hp;src.connect(filter);filter.connect(g);g.connect(target);src.start(when);src.stop(when+length+.02)}
@@ -361,8 +366,8 @@ function tick(){
     masterPerformance.onStep(step,when,duration);
     const kick=kickAtStep(drum,step,observedKickPattern);
     if(kick>0)kickSidechain.trigger(when,kick);
-    bass01.scheduleStep(step,when,duration);
-    for(const module of Object.values(extraRacks))module.scheduleStep(step,when,duration);
+    if(!keyboardJam?.isHeld('bass'))bass01.scheduleStep(step,when,duration);
+    for(const [type,module] of Object.entries(extraRacks))if(type!=='acid'||!keyboardJam?.isHeld('acid'))module.scheduleStep(step,when,duration);
     extraNotes(when,step%16);
     step=(step+1)%64;
     next+=unit;
@@ -447,6 +452,7 @@ async function play(){
   finally{if(ticket===playSerial)playPending=false}
 }
 function pause(){
+  keyboardJam?.releaseAll();
   playSerial++;playPending=false;playing=false;stopClock();
   kickSidechain.reset();drumAudio?.pause();bass01.stop();for(const module of Object.values(extraRacks))module.stop();
   $('c-play').textContent='▶ JAM';
@@ -547,6 +553,8 @@ $('c-voicemute').onclick=()=>{voice[selected].mute=!voice[selected].mute;syncDru
 $('c-voicesolo').onclick=()=>{voice[selected].solo=!voice[selected].solo;syncDrums();renderRack();renderVoice()};
 $('c-reverse').onclick=()=>{voice[selected].reverse=!voice[selected].reverse;syncDrums();renderVoice()};
 $('c-step-on').onclick=()=>{currentStep().on=!currentStep().on;syncDrums();renderRack();renderVoice()};
+$('c-master-color').onchange=e=>setMasterColor(e.target.value);
+$('c-clean-drums').onclick=()=>{Object.assign(channels.drums.v,{hi:.5,hm:.5,lm:.5,low:.5,cut:1,res:0,delay:0,reverb:0,level:1});drum.master=.75;drum.masterDrive=0;setMasterColor('CLEAN');masterPerformance.bypass();set('fx.drive',0);for(const key of Object.keys(channels.drums.v))paint('drums.'+key);applyChannel(channels.drums);syncDrums();$('c-status').textContent='Clean Afterglow sound · neutral drum strip, no drum sends, clean master; patterns and drum sound settings retained'};
 $('c-hit').onclick=async()=>{try{setup();await ctx.resume();(await ensureDrumMachine()).audition(selected,1)}catch(error){$('c-status').textContent='Audition failed: '+error.message}};
 $('c-sampleload').onclick=()=>$('c-sample-file').click();
 $('c-sampleclear').onclick=()=>{sampleSlots[selected]=null;if(drumAudio?.node)drumAudio.setSamples(sampleSlots);if(voice[selected].model===2)voice[selected].model=0;renderRack();renderVoice();syncDrums()};
@@ -570,9 +578,11 @@ $('c-rec').onclick=async()=>{
   }catch(error){rec=false;$('c-status').textContent='Could not start recorder: '+error.message}
 };
 for(let i=0;i<16;i++){let o=document.createElement('option');o.value=i;o.textContent=String(i+1).padStart(2,'0');$('c-pat').append(o)}buildRackDials('voice','c-voiceknobs',rackParams);buildRackDials('step','c-stepknobs',stepParams);renderRack();renderVoice();panel();A=current();B={...A,'acid.cut':.78,'drums.delay':.47,'fx.feedback':.78,'fx.drive':.6,'fx.space':.89,'sample.cut':.3};links=Object.keys(B).filter(k=>Math.abs(A[k]-B[k])>.001);morph();
-function studioSnapshot(){return {drumPattern:drum.selectedPattern,bassPattern:bass01.state.pattern,polyPattern:extraRacks.poly.state.pattern,texturePattern:extraRacks.texture.state.pattern,acidPattern:extraRacks.acid.state.pattern,polyArp:JSON.parse(JSON.stringify(extraRacks.poly.state.polyArp)),texturePatch:JSON.parse(JSON.stringify(extraRacks.texture.state.patchRoutes)),textureBuchla:Object.fromEntries(Object.entries(extraRacks.texture.state.p).filter(([k])=>k.startsWith('buchla')||k==='cycleHz')),channels:Object.fromEntries(Object.entries(channels).map(([id,c])=>[id,{v:{...c.v},mute:c.mute,sc:c.sc}])),masterFX:{...fx},masterPerformance:masterPerformance.exportState(),sidechain:{...kickSidechain.params},harmony:{...harmonyState},monoRoot:bass01.state.root,polyRoot:extraRacks.poly.state.root,textureRoot:extraRacks.texture.state.root,acidRoot:extraRacks.acid.state.root}}
+function studioSnapshot(){return {drumPattern:drum.selectedPattern,bassPattern:bass01.state.pattern,polyPattern:extraRacks.poly.state.pattern,texturePattern:extraRacks.texture.state.pattern,acidPattern:extraRacks.acid.state.pattern,polyArp:JSON.parse(JSON.stringify(extraRacks.poly.state.polyArp)),texturePatch:JSON.parse(JSON.stringify(extraRacks.texture.state.patchRoutes)),textureBuchla:Object.fromEntries(Object.entries(extraRacks.texture.state.p).filter(([k])=>k.startsWith('buchla')||k==='cycleHz')),channels:Object.fromEntries(Object.entries(channels).map(([id,c])=>[id,{v:{...c.v},mute:c.mute,sc:c.sc}])),masterFX:{...fx},masterColor,masterPerformance:masterPerformance.exportState(),sidechain:{...kickSidechain.params},harmony:{...harmonyState},monoRoot:bass01.state.root,polyRoot:extraRacks.poly.state.root,textureRoot:extraRacks.texture.state.root,acidRoot:extraRacks.acid.state.root}}
+function setMasterColor(value){masterColor=value==='GLUE'?'GLUE':'CLEAN';fxNodes?.masterBus.setColor(masterColor);$('c-master-color').value=masterColor}
 function studioRecall(snapshot){
   if(!snapshot||typeof snapshot!=='object')return;
+  setMasterColor(snapshot.masterColor||'GLUE');
   if(snapshot.masterPerformance)masterPerformance.restoreState(snapshot.masterPerformance);
   if(snapshot.harmony){Object.assign(harmonyState,normalizeHarmony(snapshot.harmony));harmonicPanel?.render()}
   for(const [module,k] of [[bass01,'monoRoot'],[extraRacks.poly,'polyRoot'],[extraRacks.texture,'textureRoot'],[extraRacks.acid,'acidRoot']]){if(Number.isInteger(snapshot[k])&&snapshot[k]>=12&&snapshot[k]<=96){module.state.root=snapshot[k];module.refreshUI?.()}}
@@ -632,7 +642,7 @@ function restoreRackProject(module,saved,type){
  module.refreshUI?.();
 }
 async function restoreProject(packageData){
- const data=validateProject(packageData);
+ const data=validateProject(packageData);keyboardJam?.setEnabled(false);
  if(playing)pause();
  // Reels are decoded and validated before any rack or drum state is overwritten.
  sampler.restoreProject(data.sampler);
@@ -721,6 +731,24 @@ conductor=createConductor({mount:$('cs10-seq-host'),sceneHost:$('cs10-scene-host
 harmonicPanel=mountHarmonyPanel($('cs17-harmony-host'),harmonyState,{
  onApply:opts=>{const instruments=applyStudioHarmony(opts);$('c-status').textContent='Harmony aligned · '+instruments.join(' / ')},
  onFromPoly:()=>{const a=extraRacks.poly.state.polyArp;Object.assign(harmonyState,normalizeHarmony({...harmonyState,key:a.key,scale:a.scale,degree:a.degree}))}
+});
+keyboardJam=mountKeyboardJam($('c-keyboard-host'),{
+ getRoot:target=>target==='bass'?bass01.state.root:extraRacks[target]?.state.root||60,
+ onSelect:target=>$( {drum:'c-drum-select',bass:'c-bass-select',poly:'c-poly-select',texture:'c-texture-select',acid:'c-acid-select',sampler:'c-sampler-select'}[target]).click(),
+ prepare:async target=>{setup();await ctx.resume();if(target==='drum')await ensureDrumMachine()},
+ onNote:async ({target,note,index,velocity,isHeld})=>{
+  setup();await ctx.resume();if(target==='drum')await ensureDrumMachine();if(!isHeld())return;
+  const at=ctx.currentTime+.005;
+  if(target==='drum'){drumAudio.audition(index,velocity);if(index===0)kickSidechain.trigger(at,velocity);return}
+  if(target==='sampler')return sampler.triggerSlot(index);
+  if(target==='bass'){const engine=bass01.getEngine();engine.previousSlide=false;engine.noteOn(note,at,1,velocity>.9,false,true);return ()=>engine.noteOff()}
+  const engine=extraRacks[target].getEngine();
+  if(target==='acid'){engine.note(note,at,1,velocity>.9,false,false,true);return ()=>engine.stop()}
+  const voice=engine.note(note,at,1,velocity,{held:true});return ()=>engine.releaseVoice(voice);
+ },
+ onTransport:()=>playing||playPending?pause():play(),
+ onMute:target=>{const id={drum:'drums',bass:'acid',poly:'poly',texture:'texture',acid:'tb303',sampler:'sample'}[target];channels[id].el.querySelector('.mute').click()},
+ onError:error=>{$('c-status').textContent='Keyboard: '+error.message}
 });
 const blankProject=captureProject();
 let activeSongId=null,activeSongName='',activeChoice='blank',savedFingerprint='';

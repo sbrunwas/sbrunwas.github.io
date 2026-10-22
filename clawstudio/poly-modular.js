@@ -66,14 +66,14 @@ export const clawPatchbay=(()=>{
       sources[texture?'MOD OSC':'LFO A'].frequency.setTargetAtTime(v.a,now,.02);sources[texture?'CYCLE':'LFO B'].frequency.setTargetAtTime(v.b,now,.02);if(texture)sources.MOTION.frequency.setTargetAtTime(v.a*.31,now,.02);
       if(v.hold!==noiseRate&&!shared['S&H']){noiseRate=v.hold;rand.offset.cancelScheduledValues(now);if(sources.RANDOM){const value=sources.RANDOM.offset.value;sources.RANDOM.offset.cancelScheduledValues(now);sources.RANDOM.offset.setValueAtTime(value,now)}noiseAt=now; if(!shared['S&H']&&(options.sharedClock||currentRoutes.some(r=>r.source==='S&H'||r.source==='RANDOM')))scheduleNoise(Number.isFinite(options.stopAt)?options.stopAt:now+3);}
     }
-    function noteOn(time,duration,{attack=.02,decay=.2,sustain=.6,release=.2,velocity=1}={}){
+    function noteOn(time,duration,{attack=.02,decay=.2,sustain=.6,release=.2,velocity=1,held=false}={}){
       const t=Math.max(at,time,ctx.currentTime+.001),gate=Math.max(.01,duration),a=Math.max(.002,attack),d=Math.max(.01,decay),s=Math.max(0,Math.min(1,sustain)),rel=Math.max(.01,release);
       const env=sources[texture?'ENVELOPE':'ENV'].offset,vel=sources.VELOCITY?.offset;
       env.cancelScheduledValues(t);env.setValueAtTime(0,t);env.linearRampToValueAtTime(1,t+a);
       env.setTargetAtTime(s,t+a,d/3);
       // Continuity at release: exponential ADSR decay approaches sustain.
       const atRelease=t+Math.max(a,gate),before=s+(1-s)*Math.exp(-(Math.max(0,gate-a))/(d/3));
-      env.setValueAtTime(before,atRelease);env.setTargetAtTime(0,atRelease,rel/3);
+      if(!held){env.setValueAtTime(before,atRelease);env.setTargetAtTime(0,atRelease,rel/3);}
       vel?.setValueAtTime(Math.max(0,Math.min(1,velocity)),t);
       if(!shared['S&H']&&(options.sharedClock||currentRoutes.some(r=>r.source==='S&H'||r.source==='RANDOM')))scheduleNoise(t+gate+rel+.4);
     }
@@ -82,7 +82,7 @@ export const clawPatchbay=(()=>{
     function dispose(){if(tick!==null&&typeof clearInterval==='function')clearInterval(tick);for(const e of edges.splice(0)){try{e.source.disconnect(e.gain)}catch{}try{e.gain.disconnect()}catch{}}for(const node of starts){try{node.stop()}catch{}try{node.disconnect()}catch{}}}
     setRoutes(routes);
     if(Number.isFinite(options.stopAt))for(const node of starts)node.stop(Math.max(at+.01,options.stopAt));
-    return {setRoutes,setRates,noteOn,noteOff,dispose,getSource:key=>sources[key]||null,getSources:()=>({...sources}),get routes(){return currentRoutes.slice()}};
+    return {setRoutes,setRates,noteOn,noteOff,dispose,stopAt(time){for(const node of starts)node.stop(time)},getSource:key=>sources[key]||null,getSources:()=>({...sources}),get routes(){return currentRoutes.slice()}};
   }
   const IDEAS={
     mono:{'WOBBLE':[{source:'LFO A',dest:'LP FREQ',depth:.7},{source:'ENV',dest:'RESONANCE',depth:.36}],

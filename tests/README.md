@@ -16,3 +16,8 @@ node tests/song-library.cjs
 ```
 
 Set `BASE_URL` for another server port, or `CHROMIUM_BIN` to use an existing Chromium executable. The test uses isolated browser storage and checks blank startup, explicit demo loading, named song save/load across refreshes, overwrite/rename behavior, unsaved-change cancellation, preservation of older scene maps and browser backups, persistence of Poly synthesis settings, and import of legacy projects and patches.
+
+- `/tests/keyboard-jam.html`: opt-in key mapping and typing protection, chord releases, Mono note priority, startup races, focus cleanup, sustained notes on all synths, and source cleanup on all Texture engines.
+- `/tests/drum-transparency.html`: renders the bundled Afterglow engine through the actual studio mixer components; the neutral path must null against its direct output for 909, 808, Linn and Perkons. Also checks the optional Glue, Heat and channel filter.
+
+Run `node tests/master-transitions.cjs` for sample-clock transition timing, stereo reverb decay, zero-mix/intensity bypass and release continuity (no browser dependencies). With Playwright installed and the repository-root server running, `node tests/jam-and-transitions.cjs` checks real keyboard audio, typing modes, sampler gates, shortcuts, transition controls, legacy project migration and clean drum settings. `BASE_URL` and `CHROMIUM_BIN` work as above.

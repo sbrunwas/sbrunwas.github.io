@@ -141,7 +141,7 @@ export class Bass01Engine{
     // PWM modulation is computed on the UI thread at 25 Hz; no heavy audio-rate wave creation.
     if(!this._modInterval){this._modInterval=setInterval(()=>{if(this.ctx.state!=='running')return;const q=this.params;let shift=0;[1,2].forEach(i=>{if(q['lfo'+i+'Target']==='PWM')shift+=Math.sin(this.ctx.currentTime*2*Math.PI*exp(q['lfo'+i+'Rate'],.05,23))*q['lfo'+i+'Depth']*.32});const duty=norm(q.pwm+shift,.08,.92);if(Math.abs(duty-this._lastPulse)>.017){this.pulse.setPeriodicWave(this._pulse(duty));this._lastPulse=duty}},40)}
   }
-  noteOn(midi,time,length,accent=false,slide=false){if(!this.ready)return;const p=this.params,hzNote=hz(midi),glide=exp(p.glide,.002,.24),t=Math.max(time,this.ctx.currentTime+.004),tail=Math.max(.008,length*(slide?1.08:.83));const freqTargets=[this.carrier,this.pulse,this.super1,this.super2,this.sub];const values=[hzNote,hzNote,hzNote,hzNote,hzNote/Math.pow(2,p.subOct)];
+  noteOn(midi,time,length,accent=false,slide=false,held=false){if(!this.ready)return;const p=this.params,hzNote=hz(midi),glide=exp(p.glide,.002,.24),t=Math.max(time,this.ctx.currentTime+.004),tail=held?Infinity:Math.max(.008,length*(slide?1.08:.83));const freqTargets=[this.carrier,this.pulse,this.super1,this.super2,this.sub];const values=[hzNote,hzNote,hzNote,hzNote,hzNote/Math.pow(2,p.subOct)];
     freqTargets.forEach((o,i)=>{o.frequency.cancelScheduledValues(t);if(this.previousSlide&&this.lastNote!==null){o.frequency.setValueAtTime(hz(this.lastNote)/(i===4?Math.pow(2,p.subOct):1),t);o.frequency.exponentialRampToValueAtTime(values[i],t+glide)}else{o.frequency.setValueAtTime(values[i],t)}});this.fm.frequency.setValueAtTime(hzNote*p.fmRatio,t);this.fmGain.gain.setTargetAtTime(p.mode==='FM'?hzNote*p.fmIndex*6:0,t,.01);
     // Independent amp and filter ADSR envelopes. The end of the note gate
     // triggers a release, not an abrupt value jump, so short/dotted notes pop.
@@ -161,7 +161,7 @@ export class Bass01Engine{
         gain.setTargetAtTime(sustain,t+a,d/3);
       }
     }
-    if(!slide){
+    if(!slide&&!held){
       const current=this.previousSlide?sustain:tail<=a?.0001+(peak-.0001)*tail/a:sustain+(peak-sustain)*Math.exp(-(tail-a)/(d/3));
       gain.setValueAtTime(Math.max(.0001,current),t+tail);
       gain.setTargetAtTime(.0001,t+tail,rel/3);
@@ -185,11 +185,11 @@ export class Bass01Engine{
       if(tail<=fa){
         const atEnd=initial*Math.pow(top/initial,tail/fa);
         frequency.exponentialRampToValueAtTime(atEnd,t+tail);
-        if(!slide){frequency.setTargetAtTime(initial,t+tail,fr/3)}
+        if(!slide&&!held){frequency.setTargetAtTime(initial,t+tail,fr/3)}
       }else{
         frequency.exponentialRampToValueAtTime(top,t+fa);
         frequency.setTargetAtTime(sust,t+fa,fd/3);
-        if(!slide){
+        if(!slide&&!held){
           const atEnd=sust+(top-sust)*Math.exp(-(tail-fa)/(fd/3));
           frequency.setValueAtTime(bounds(atEnd),t+tail);
           frequency.setTargetAtTime(initial,t+tail,fr/3);
@@ -199,7 +199,10 @@ export class Bass01Engine{
     if(p.duck>.01){const duck=this.duck.gain;duck.cancelScheduledValues(t);duck.setValueAtTime(1-p.duck*.73,t);duck.linearRampToValueAtTime(1,t+.12)}
     this.lastNote=midi;this.previousSlide=slide;
   }
-  noteOff(){const t=this.ctx.currentTime;this.env.gain.cancelScheduledValues(t);this.env.gain.setTargetAtTime(.0001,t,.08);this.previousSlide=false}
+  noteOff(){const t=this.ctx.currentTime;if(this.env.gain.cancelAndHoldAtTime)this.env.gain.cancelAndHoldAtTime(t);else this.env.gain.cancelScheduledValues(t);this.env.gain.setTargetAtTime(.0001,t,Math.max(.004,(.012+this.params.release**2*1.55)/3));this.previousSlide=false;
+    const p=this.params,keyScale=2**(((this.lastNote??36)-36)*p.keytrack/48),release=p.filterSource==='AMP'?p.release:(p.fRelease??.12);
+    for(const [node,base] of [[this.lp,exp(p.lp,52,19000)],[this.hp,exp(p.hp,28,5000)]]){const frequency=node.frequency;if(frequency.cancelAndHoldAtTime)frequency.cancelAndHoldAtTime(t);else frequency.cancelScheduledValues(t);frequency.setTargetAtTime(Math.min(19500,Math.max(22,base*keyScale)),t,Math.max(.004,(.02+release*release*1.8)/3))}
+  }
   dispose(){this.noteOff();clearInterval(this._modInterval);for(let o of [this.carrier,this.pulse,this.super1,this.super2,this.sub,this.fm,this.noiseSource,...this.lfos.map(x=>x.o)])try{o.stop()}catch{}this.output.disconnect();this.feedback.disconnect()}
 }
 function knobMarkup(id,label,description=''){return `<div class="b01knobwrap"><div class="b01knoblabel">${label}</div><div class="b01knob" role="slider" tabindex="0" data-param="${id}" title="${description||label}"><i></i></div><span class="b01read" data-value="${id}"></span></div>`}

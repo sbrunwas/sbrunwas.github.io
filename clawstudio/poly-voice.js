@@ -15,7 +15,7 @@ export function createPolyOscillator(ctx,{start,end,frequency,coarse,kind,detune
  const {superSawDetune,superSawMix,offsets,wave}=helpers;
  const output=ctx.createGain(),oscillators=[],layers=[],shapers=[];
  const internalFM=ctx.createOscillator(),fmDepth=ctx.createGain();
- internalFM.connect(fmDepth);internalFM.start(start);internalFM.stop(end);
+ internalFM.connect(fmDepth);internalFM.start(start);if(Number.isFinite(end))internalFM.stop(end);
  // A fixed bank lets waveform changes take effect on held notes, including Super Saw.
  for(let i=0;i<7;i++){
   const osc=ctx.createOscillator(),level=ctx.createGain(),shaper=ctx.createWaveShaper();
@@ -51,9 +51,9 @@ export function createPolyOscillator(ctx,{start,end,frequency,coarse,kind,detune
  for(const osc of oscillators){
   // Decorrelate the saw phases without restarting a held note when changing modes.
   const headroom=1/Math.max(1,osc.frequency.value);
-  osc.start(Math.max(ctx.currentTime,start-Math.random()*headroom));osc.stop(end);
+  osc.start(Math.max(ctx.currentTime,start-Math.random()*headroom));if(Number.isFinite(end))osc.stop(end);
  }
- return {output,oscillators,layers,update,dispose(time=ctx.currentTime){
+ return {output,oscillators,layers,update,stopAt(time){for(const node of [...oscillators,internalFM])node.stop(time)},dispose(time=ctx.currentTime){
   for(const node of [...oscillators,internalFM]){try{node.stop(time)}catch{}}
   // Allow the caller's short voice-stealing fade to finish before disconnection.
   if(time<=ctx.currentTime){output.disconnect();fmDepth.disconnect();for(const node of [...oscillators,...layers,...shapers])node.disconnect()}

@@ -1,0 +1,43 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Keyboard Jam regressions</title><pre id="results">Running…</pre><div id="keys"></div><input id="text"><script type="module">
+import {mountKeyboardJam} from '../clawstudio/keyboard-jam.js';
+import {createRackInstrument,TEXTURE_ENGINES} from '../clawstudio/rack-devices.js';
+import {createBass01} from '../clawstudio/bass01.js';
+const assert=(ok,message)=>{if(!ok)throw Error(message)},lines=[],results=document.querySelector('#results');
+const pass=message=>{lines.push('PASS '+message);results.textContent=lines.join('\n')};
+const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
+const key=(code,down=true,options={})=>{const event=new KeyboardEvent(down?'keydown':'keyup',{code,key:code.startsWith('Key')?code.slice(3).toLowerCase():code,bubbles:true,cancelable:true,...options});document.querySelector('#text').dispatchEvent(event);return event};
+const power=(a,start,end)=>{let sum=0;for(let i=start*48000;i<end*48000;i++)sum+=a[i]**2;return sum/((end-start)*48000)};
+try{
+ const calls=[],offs=[];let transport=0,mutes=0;const controller=mountKeyboardJam(document.querySelector('#keys'),{getRoot:()=>60,onNote:entry=>{calls.push(entry);return ()=>offs.push(entry.note??entry.index)},onTransport:()=>transport++,onMute:()=>mutes++,onSelect:()=>{}});
+ assert(!key('KeyA').defaultPrevented&&calls.length===0,'Edit mode leaves typing untouched');
+ controller.setTarget('poly');controller.setEnabled(true);key('KeyA');key('KeyD');key('KeyG',true,{shiftKey:true});await tick();
+ assert(calls.map(c=>c.note).join(',')==='60,64,67','piano mapping plays C major');assert(calls[2].velocity===1,'Shift accent');
+ key('KeyA',true,{repeat:true});assert(calls.length===3,'key repeat does not retrigger');key('KeyD',false);await tick();assert(offs.join(',')==='64','releasing a chord note leaves other notes held');
+ assert(document.querySelectorAll('.is-held').length===2,'held key indicators');
+ assert(key('KeyR').defaultPrevented,'unmapped typing blocked while jamming');key('KeyA',true,{ctrlKey:true});assert(calls.length===3,'Ctrl shortcuts do not trigger');
+ key('Space');key('Space',true,{repeat:true});await tick();assert(transport===1,'one transport toggle per press');key('KeyM');assert(mutes===1,'mute shortcut');
+ key('KeyX');await tick();assert(offs.length===3,'octave changes release held notes');key('KeyA');await tick();assert(calls.at(-1).note===72,'octave transposition');
+ key('Digit2');await tick();assert(controller.target==='bass'&&document.querySelectorAll('.is-held').length===0,'target shortcut releases notes');
+ const start=calls.length;key('KeyA');await tick();key('KeyS');await tick();key('KeyS',false);await tick();key('KeyA',false);await tick();assert(calls.slice(start).map(c=>c.note).join(',')==='72,74,72','Mono uses last-note priority and returns to held note');
+ controller.setTarget('drum');key('KeyK');await tick();assert(calls.at(-1).index===7,'drum keys map to lanes');key('Escape');await tick();assert(!controller.enabled&&document.querySelectorAll('.is-held').length===0,'Escape returns to Edit and releases notes');
+ assert(!key('KeyA').defaultPrevented,'typing restored after Escape');controller.setEnabled(true);key('KeyA');await tick();window.dispatchEvent(new Event('blur'));assert(!controller.enabled,'focus loss disarms keyboard');controller.destroy();
+ pass('opt-in typing protection, piano chords, repeat suppression, note releases, octave/target/transport/mute shortcuts, Mono priority and focus cleanup');
+
+ let ready;const pending=new Promise(resolve=>ready=resolve);let late=0;const slow=mountKeyboardJam(document.querySelector('#keys'),{onNote:async entry=>{await pending;if(entry.isHeld())late++;return ()=>{}},onTransport:()=>{},onMute:()=>{},onSelect:()=>{}});slow.setEnabled(true);key('KeyA');key('KeyA',false);ready();await tick();assert(late===0,'released key cannot fire after async audio startup');slow.destroy();pass('rapid key release cannot cause late notes during engine loading');
+
+ for(const type of ['mono','poly','texture','acid']){
+  const mount=document.createElement('div');document.body.append(mount);const rack=type==='mono'?createBass01(mount):createRackInstrument(mount,type),p=rack.state.params||rack.state.p;
+  Object.assign(p,{attack:0,decay:.1,sustain:1,release:0,chorus:0,delay:0,feedback:0,space:0,env:0,cutoff:1,res:0,level:.6,volume:.6,motion:0,depth:0,evolve:0,filterEnv:0,buchlaLpg:0,buchlaFold:0,pace:'DRONE'});
+  if(type==='texture')rack.state.patchRoutes.splice(0);
+  const ctx=new OfflineAudioContext(2,48000*2,48000),engine=rack.init(ctx,ctx.destination);let voice;
+  if(type==='mono')engine.noteOn(60,0,.1,false,false,true);else if(type==='acid')engine.note(60,0,.1,false,false,false,true);else voice=engine.note(60,0,.1,1,{held:true});
+  if(type==='texture')clearInterval(engine._tick);
+  ctx.suspend(1).then(()=>{if(type==='mono')engine.noteOff();else if(type==='acid')engine.stop();else engine.releaseVoice(voice);ctx.resume()});
+  const buffer=await ctx.startRendering(),audio=buffer.getChannelData(0);assert(audio.every(Number.isFinite),type+' finite audio');assert(power(audio,.6,.8)>1e-7,type+' sustains well beyond the old short gate');assert(power(audio,1.6,1.8)<power(audio,.6,.8)*.001,type+' key release silences voice');
+  rack.dispose();mount.remove();pass(type+' renders held notes and key-up releases');
+ }
+ for(const kind of TEXTURE_ENGINES){const mount=document.createElement('div');document.body.append(mount);const rack=createRackInstrument(mount,'texture');rack.state.p.engine=kind;const ctx=new OfflineAudioContext(2,48000,48000),engine=rack.init(ctx,ctx.destination);clearInterval(engine._tick);const voice=engine.note(60,0,.1,1,{held:true});ctx.suspend(.25).then(()=>{engine.releaseVoice(voice);ctx.resume()});const buffer=await ctx.startRendering();assert(buffer.getChannelData(0).every(Number.isFinite),kind+' supports keyboard gate');assert(Number.isFinite(voice.end),kind+' release bounds source lifetime');rack.dispose();mount.remove()}
+ pass('all seven Texture engines release their oscillators and noise sources');
+ document.documentElement.dataset.result='passed';
+}catch(error){document.documentElement.dataset.result='failed';results.textContent=lines.join('\n')+'\nFAIL '+error.stack;throw error}
+</script></html>

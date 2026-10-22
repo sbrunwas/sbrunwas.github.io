@@ -1,12 +1,12 @@
 import {attachStepSequencer,eventsForStep,normalizeBank,LENGTHS} from './step-sequencer.js?v=shared-seq-20261021';
-import {POLY_WAVEFORMS,POLY_VOICE_DEFAULTS,normalizePolyVoice,polyFmRatio,createPolyOscillator} from './poly-voice.js?v=poly-voice-20261021';
+import {POLY_WAVEFORMS,POLY_VOICE_DEFAULTS,normalizePolyVoice,polyFmRatio,createPolyOscillator} from './poly-voice.js?v=jam-studio-20261022';
 import {coarseCents,attachCoarsePitch} from './coarse-pitch.js?v=slow-coarse-20261020';
 // ClawStudio original browser rack prototypes — not vendor ROM emulations.
 // Three playable instrument modules share the host AudioContext, transport and routing.
 import {newPolyArp,arpEventsAtStep} from './poly-arp.js';
 import {attachPolyArp} from './poly-arp-ui.js';
-import {clawPatchbay} from './poly-modular.js?v=poly-voice-20261021';
-import {textureCycleRate,buchlaParamDefaults,BUCHLA_DEFAULT_ROUTES,attachBuchlaPanel,patchModulation} from './texture-patch.js?v=slow-coarse-20261020';
+import {clawPatchbay} from './poly-modular.js?v=jam-studio-20261022';
+import {textureCycleRate,buchlaParamDefaults,BUCHLA_DEFAULT_ROUTES,attachBuchlaPanel,patchModulation} from './texture-patch.js?v=jam-studio-20261022';
 const TAU=2*Math.PI, cap=(n,a=0,b=1)=>Math.max(a,Math.min(b,n)), hz=n=>440*Math.pow(2,(n-69)/12);
 const midiName=n=>['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][((n%12)+12)%12]+(Math.floor(n/12)-1);
 const ease=(v,min,max)=>min*Math.pow(max/min,cap(v));
@@ -102,10 +102,14 @@ export function acidSlideFromPrevious(pattern,index,length){
 }
 function freshSteps(){return Array.from({length:64},()=>({on:false,note:0,accent:false,slide:false,gate:.7,repeats:1,chord:[0],inversion:0}));}
 function en(g,t,attack,decay,sustain,release,dur,level=1){const a=.002+attack*1.3,d=.025+decay*2.1,r=.03+release*3.2,gate=Math.max(.08,dur);g.setValueAtTime(.0001,t);g.linearRampToValueAtTime(level,t+a);g.setTargetAtTime(Math.max(.0001,sustain*level),t+a,Math.max(.01,d/3));g.setTargetAtTime(.0001,t+gate,Math.max(.01,r/3));return t+gate+r*3}
-function stage(g,t,a,d,s,r,len,level=1){const at=.003+a*a*1.8,dc=.025+d*d*2,rt=.035+r*r*4,gate=Math.max(.005,len),sustain=Math.max(.0001,s*level);g.setValueAtTime(.0001,t);
+function stage(g,t,a,d,s,r,len,level=1,held=false){const at=.003+a*a*1.8,dc=.025+d*d*2,rt=.035+r*r*4,gate=Math.max(.005,len),sustain=Math.max(.0001,s*level);g.setValueAtTime(.0001,t);
+ if(held){g.linearRampToValueAtTime(level,t+at);g.setTargetAtTime(sustain,t+at,Math.max(.006,dc/3));return Infinity}
  if(gate<=at)g.linearRampToValueAtTime(Math.max(.0001,level*gate/at),t+gate);
  else{g.linearRampToValueAtTime(level,t+at);g.setTargetAtTime(sustain,t+at,Math.max(.006,dc/3));g.setValueAtTime(sustain+(level-sustain)*Math.exp(-(gate-at)/Math.max(.006,dc/3)),t+gate)}
  g.setTargetAtTime(.0001,t+gate,Math.max(.012,rt/3));return t+gate+rt*3}
+
+function stopSource(node,time){if(Number.isFinite(time))node.stop(time)}
+function releaseParam(param,t,seconds){if(param.cancelAndHoldAtTime)param.cancelAndHoldAtTime(t);else param.cancelScheduledValues(t);param.setTargetAtTime(.0001,t,Math.max(.004,seconds/3))}
 
 function oscillator(ctx,wave,hz0,t,end,gain,dest){const o=ctx.createOscillator(),a=ctx.createGain();o.type=wave;o.frequency.setValueAtTime(Math.min(18000,hz0),t);a.gain.value=gain;o.connect(a);a.connect(dest);o.start(t);o.stop(end);o.levelNode=a;return o}
 function impulse(ctx,seconds=1.8){const len=Math.round(ctx.sampleRate*seconds),b=ctx.createBuffer(2,len,ctx.sampleRate);let seed=91261;for(let ch=0;ch<2;ch++){const a=b.getChannelData(ch);for(let i=0;i<len;i++){seed=(Math.imul(seed,1664525)+1013904223)|0;a[i]=((seed>>>9)/4194304-1)*Math.pow(1-i/len,2.65)}}return b}
@@ -157,16 +161,16 @@ class PolyEngine{
    for(const v of this.voices){v.cv?.setRoutes(this.patchRoutes);v.cv?.setRates(this.patchRates)}
  }
  setPatchRates(rates){this.patchRates=clawPatchbay.ratesSafe(rates);this.modulators.setRates(this.patchRates);for(const v of this.voices)v.cv?.setRates(this.patchRates)}
- note(midi,t,dur,velocity=1){const p=this.p,ctx=this.ctx,f=hz(midi);
+ note(midi,t,dur,velocity=1,{held=false}={}){const p=this.p,ctx=this.ctx,f=hz(midi);
  // Eight-voice polyphony cap with gentle voice stealing and bounded oscillator lifetimes.
  this.voices=this.voices.filter(v=>{if(v.end>ctx.currentTime)return true;v.dispose();return false});
- if(this.voices.length>=8){const oldest=this.voices.shift();oldest.amp.gain.cancelScheduledValues(t);oldest.amp.gain.setTargetAtTime(.0001,t,.007);oldest.dispose(t+.06)}
+ if(this.voices.length>=8){const oldest=this.voices.shift();oldest.released=true;oldest.amp.gain.cancelScheduledValues(t);oldest.amp.gain.setTargetAtTime(.0001,t,.007);oldest.dispose(t+.06)}
  const cut=ctx.createBiquadFilter();cut.type='lowpass';cut.frequency.setValueAtTime(ease(p.cutoff,100,18000),t);cut.Q.value=.65+p.res*14;
  const out=ctx.createGain();out.gain.value=p.level*.5;const pan=ctx.createStereoPanner();pan.pan.value=0;const amp=ctx.createGain();amp.gain.value=.0001;cut.connect(amp);amp.connect(out);out.connect(pan);pan.connect(this.fx.input);
- const end=stage(amp.gain,t,p.attack,p.decay,p.sustain,p.release,dur,.36*Math.max(.1,Math.min(1,velocity)));
+ const end=stage(amp.gain,t,p.attack,p.decay,p.sustain,p.release,dur,.36*Math.max(.1,Math.min(1,velocity)),held);
  const filterEnvelope=ctx.createConstantSource(),filterEnvGain=ctx.createGain();filterEnvGain.gain.value=p.env*1800;
- stage(filterEnvelope.offset,t,p.filterAttack,p.filterDecay,p.filterSustain,p.filterRelease,dur,1);
- filterEnvelope.connect(filterEnvGain);filterEnvGain.connect(cut.detune);filterEnvelope.start(t);filterEnvelope.stop(end+.08);
+ stage(filterEnvelope.offset,t,p.filterAttack,p.filterDecay,p.filterSustain,p.filterRelease,dur,1,held);
+ filterEnvelope.connect(filterEnvGain);filterEnvGain.connect(cut.detune);filterEnvelope.start(t);stopSource(filterEnvelope,end+.08);
  const helpers={superSawDetune,superSawMix,offsets:SUPER_SAW_OFFSETS,wave};
  const first=this.oscillatorSettings(f),secondSettings=this.oscillatorSettings(f,true);
  const oscillator1=createPolyOscillator(ctx,{...first,start:t,end:end+.04},helpers);
@@ -190,11 +194,12 @@ class PolyEngine{
     seed:(midi*2654435761+Math.round(t*ctx.sampleRate))>>>0,
     previousVoice:previous?{oscillator:previous.osc[0],envelope:previous.cv?.getSource('ENV')}:null});
  cv.noteOn(t,dur,{attack:.003+p.attack*p.attack*1.8,decay:.025+p.decay*p.decay*2,
-   sustain:p.sustain,release:.035+p.release*p.release*4,velocity});
+   sustain:p.sustain,release:.035+p.release*p.release*4,velocity,held});
  const dispose=(time=ctx.currentTime)=>{cv.dispose();oscillator1.dispose(time);oscillator2.dispose(time);try{filterEnvelope.stop(time)}catch{}if(time<=ctx.currentTime){filterEnvelope.disconnect();filterEnvGain.disconnect();crossFM.disconnect();osc2Gain.disconnect();cut.disconnect();amp.disconnect();out.disconnect();pan.disconnect()}};
- this.voices.push({end,start:t,amp,osc:oscs,cv,cut,out,pan,hz:f,kind:p.wave,layers:oscillator1.layers,second,oscillator1,oscillator2,osc2Gain,crossFM,filterEnvelope,filterEnvGain,dispose});
+ const voice={end,start:t,amp,osc:oscs,cv,cut,out,pan,hz:f,kind:p.wave,layers:oscillator1.layers,second,oscillator1,oscillator2,osc2Gain,crossFM,filterEnvelope,filterEnvGain,dispose};this.voices.push(voice);return voice;
  }
- releaseVoices(){const t=this.ctx.currentTime;for(const v of this.voices){v.amp.gain.cancelScheduledValues(t);v.amp.gain.setTargetAtTime(.0001,t,.015);v.cv?.noteOff(t);if(v.filterEnvelope.offset.cancelAndHoldAtTime)v.filterEnvelope.offset.cancelAndHoldAtTime(t);else v.filterEnvelope.offset.cancelScheduledValues(t);v.filterEnvelope.offset.setTargetAtTime(.0001,t,Math.max(.012,(.035+this.p.filterRelease**2*4)/3))}}
+ releaseVoice(v){if(!v||v.released)return;v.released=true;const t=this.ctx.currentTime,release=.035+this.p.release**2*4;releaseParam(v.amp.gain,t,release);releaseParam(v.filterEnvelope.offset,t,.035+this.p.filterRelease**2*4);v.cv.noteOff(t);v.end=t+release*3;v.oscillator1.stopAt(v.end+.04);v.oscillator2.stopAt(v.end+.04);stopSource(v.filterEnvelope,v.end+.08);v.cv.stopAt(v.end+.08)}
+ releaseVoices(){const t=this.ctx.currentTime;for(const v of this.voices){this.releaseVoice(v);v.amp.gain.cancelScheduledValues(t);v.amp.gain.setTargetAtTime(.0001,t,.015);v.cv?.noteOff(t);if(v.filterEnvelope.offset.cancelAndHoldAtTime)v.filterEnvelope.offset.cancelAndHoldAtTime(t);else v.filterEnvelope.offset.cancelScheduledValues(t);v.filterEnvelope.offset.setTargetAtTime(.0001,t,Math.max(.012,(.035+this.p.filterRelease**2*4)/3))}}
  dispose(){this.modulators.dispose();for(const v of this.voices)v.dispose();this.voices=[];this.ensemble.dispose();this.fx.input.disconnect();this.fx.wet.disconnect();this.fx.delayWet.disconnect()}
 }
 // Six complementary engines deliberately use DIFFERENT synthesis paths.
@@ -241,9 +246,9 @@ class TextureEngine{
   }
   this.voices=this.voices.filter(v=>{if(v.end>t)return true;v.cv?.dispose();return false});
  }
- note(midi,t,dur,velocity=1,{sequenced=false}={}){const p=this.p,ctx=this.ctx,f=hz(midi),kind=TEXTURE_ENGINES.includes(p.engine)?p.engine:'WAVETABLE';
+ note(midi,t,dur,velocity=1,{sequenced=false,held=false}={}){const p=this.p,ctx=this.ctx,f=hz(midi),kind=TEXTURE_ENGINES.includes(p.engine)?p.engine:'WAVETABLE';
   this.voices=this.voices.filter(v=>{if(v.end>ctx.currentTime)return true;v.cv?.dispose();return false});
-  if(this.voices.length>=9){const oldest=this.voices.shift();oldest.cv?.dispose();oldest.amp.gain.cancelScheduledValues(t);oldest.amp.gain.setTargetAtTime(.0001,t,.012)}
+  if(this.voices.length>=9){const oldest=this.voices.shift();oldest.released=true;oldest.cv?.dispose();oldest.amp.gain.cancelScheduledValues(t);oldest.amp.gain.setTargetAtTime(.0001,t,.012);for(const source of oldest.sources)stopSource(source,t+.1)}
   const pre=ctx.createGain(),f1=ctx.createBiquadFilter(),f2=ctx.createBiquadFilter(),sum=ctx.createGain(),amp=ctx.createGain(),pan=ctx.createStereoPanner();
   f1.type=TEXTURE_FILTERS[p.filterA]||'lowpass';f2.type=TEXTURE_FILTERS[p.filterB]||'highpass';
   f1.frequency.value=ease(p.cutoff,45,16200);f2.frequency.value=ease(p.filter2,35,14900);
@@ -254,23 +259,24 @@ class TextureEngine{
   sum.connect(lpgFilter);lpgFilter.connect(lpgGain);lpgGain.connect(amp);amp.connect(pan);const level=ctx.createGain();level.gain.value=p.level;pan.connect(level);level.connect(this.fx.input);
   const pace=p.pace==='PLUCK'?.18:p.pace==='PULSE'?.53:p.pace==='SWARM'?1.4:2.7;
   const length=sequenced?Math.max(.008,dur):Math.max(.1,dur,pace*(.45+p.evolve*1.3));
-  const end=stage(amp.gain,t,kind==='RESONATOR'?Math.min(.025,p.attack):(p.pace==='PLUCK'?Math.min(.08,p.attack):p.attack),p.decay,p.pace==='PLUCK'?Math.min(.16,p.sustain):p.sustain,p.release,length,.22*Math.max(.05,Math.min(1,velocity)));
-  const voice={kind,start:t,end,seed:Math.random(),phaseOrigin:this.phaseOrigin,hz:f,level,pitched:[],tuning:[],carriers:[],buckets:[],f1,f2,pan,amp,fold,lpgFilter,lpgGain,foldBucket:null,modDepth:null,bands:null,bandBase:null};
+  const end=stage(amp.gain,t,kind==='RESONATOR'?Math.min(.025,p.attack):(p.pace==='PLUCK'?Math.min(.08,p.attack):p.attack),p.decay,p.pace==='PLUCK'?Math.min(.16,p.sustain):p.sustain,p.release,length,.22*Math.max(.05,Math.min(1,velocity)),held);
+  const voice={kind,start:t,end,seed:Math.random(),phaseOrigin:this.phaseOrigin,hz:f,level,sources:[],pitched:[],tuning:[],carriers:[],buckets:[],f1,f2,pan,amp,fold,lpgFilter,lpgGain,foldBucket:null,modDepth:null,bands:null,bandBase:null};
+  const startSource=(source,until=end+.06)=>{source.start(t);stopSource(source,until);voice.sources.push(source)};
   const tune=(osc,group=1,base=0)=>{osc.detune.value=base+coarseCents(p['coarse'+group]);voice.tuning.push({osc,group,base});return osc};
-  const osc=(shape,frequency,destination,gain=.5,group=1)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type=shape;o.frequency.setValueAtTime(Math.min(16000,frequency),t);g.gain.value=gain;o.connect(g);g.connect(destination);o.start(t);o.stop(end+.06);voice.pitched.push(o);return tune(o,group)};
-  const bufNoise=(gain)=>{const src=ctx.createBufferSource(),g=ctx.createGain();src.buffer=textureNoise(ctx);src.loop=true;g.gain.value=gain;src.connect(g);g.connect(pre);src.start(t);src.stop(end+.06);return src};
+  const osc=(shape,frequency,destination,gain=.5,group=1)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type=shape;o.frequency.setValueAtTime(Math.min(16000,frequency),t);g.gain.value=gain;o.connect(g);g.connect(destination);startSource(o);voice.pitched.push(o);return tune(o,group)};
+  const bufNoise=(gain)=>{const src=ctx.createBufferSource(),g=ctx.createGain();src.buffer=textureNoise(ctx);src.loop=true;g.gain.value=gain;src.connect(g);g.connect(pre);startSource(src);return src};
   if(kind==='WAVETABLE'){
    for(let i=0;i<3;i++){const o=osc('sine',f*(i===2?2:1),pre,[.7,p.second*.4,p.third*.33][i],i+1);const spread=(i===0?0:i===1?-1:1)*p.spread*18;voice.tuning.at(-1).base=spread;o.detune.value=spread+coarseCents(p['coarse'+(i+1)]);o.setPeriodicWave(wave(ctx,p.table,cap(p.wave+i*.13)));voice.carriers.push(o);voice.buckets.push(null)}
   }else if(kind==='FM MATRIX'){
-   const carrier=osc('sine',f,pre,.72);const mod1=ctx.createOscillator(),g1=ctx.createGain();mod1.frequency.value=f*(1+Math.round(p.wave*11));g1.gain.value=f*p.fm*(.4+p.character*8);mod1.connect(g1);g1.connect(carrier.frequency);mod1.start(t);mod1.stop(end+.06);voice.modDepth=g1;voice.pitched.push(mod1);tune(mod1,2);
-   if(p.third>.05){const mod2=ctx.createOscillator(),mg=ctx.createGain();mod2.frequency.value=f*(.51+p.ring*11);mg.gain.value=f*p.third*(1+p.second*4);mod2.connect(mg);mg.connect(mod1.frequency);mod2.start(t);mod2.stop(end+.06);voice.pitched.push(mod2);tune(mod2,3)}
+   const carrier=osc('sine',f,pre,.72);const mod1=ctx.createOscillator(),g1=ctx.createGain();mod1.frequency.value=f*(1+Math.round(p.wave*11));g1.gain.value=f*p.fm*(.4+p.character*8);mod1.connect(g1);g1.connect(carrier.frequency);startSource(mod1);voice.modDepth=g1;voice.pitched.push(mod1);tune(mod1,2);
+   if(p.third>.05){const mod2=ctx.createOscillator(),mg=ctx.createGain();mod2.frequency.value=f*(.51+p.ring*11);mg.gain.value=f*p.third*(1+p.second*4);mod2.connect(mg);mg.connect(mod1.frequency);startSource(mod2);voice.pitched.push(mod2);tune(mod2,3)}
   }else if(kind==='WAVEFOLD'){
    const fold=ctx.createWaveShaper();fold.curve=wavefoldCurve(Math.max(p.character,p.wave));
    const oscBus=ctx.createGain();oscBus.connect(fold);fold.connect(pre);osc('sine',f,oscBus,.8);if(p.second>.04)osc('triangle',f*(1+Math.round(p.wave*3)),oscBus,p.second*.48,2);
   }else if(kind==='RESONATOR'){
    const src=ctx.createBufferSource(),env=ctx.createGain(),mix=ctx.createGain();src.buffer=textureNoise(ctx);src.loop=true;
    env.gain.setValueAtTime(0,t);env.gain.linearRampToValueAtTime(.8,t+.004);env.gain.exponentialRampToValueAtTime(.0001,t+.025+p.character*.21);
-   src.connect(env);env.connect(mix);src.start(t);src.stop(end+.06);
+   src.connect(env);env.connect(mix);startSource(src);
    const ratios=[1,2.01,2.9+p.wave*.8,4.22+p.ring*2];voice.bands=[];voice.bandBase=[];
    for(let i=0;i<4;i++){const band=ctx.createBiquadFilter(),bg=ctx.createGain();band.type='bandpass';band.frequency.value=Math.min(11000,f*ratios[i]);band.Q.value=8+p.ring*65;bg.gain.value=[.8,.36,.31,.22][i];mix.connect(band);band.connect(bg);bg.connect(pre);voice.bands.push(band);voice.bandBase.push(band.frequency.value)}
    // Inharmonic damped partials supply a struck, bell-like decay instead of
@@ -282,7 +288,7 @@ class TextureEngine{
     tail.gain.setValueAtTime(.0001,t);
     tail.gain.linearRampToValueAtTime(gain,t+.007);
     tail.gain.exponentialRampToValueAtTime(.0001,Math.min(end-.08,t+.13+p.evolve*2.8/(1+i*.42)));
-    partial.connect(tail);tail.connect(pre);partial.start(t);partial.stop(end+.05);voice.pitched.push(partial);tune(partial,1);
+    partial.connect(tail);tail.connect(pre);startSource(partial,end+.05);voice.pitched.push(partial);tune(partial,1);
    }
   }else if(kind==='NOISE'){
    bufNoise(.75);if(p.fm>.06)osc('triangle',f,pre,.2+p.fm*.35);
@@ -294,11 +300,11 @@ class TextureEngine{
    const carrier=ctx.createOscillator(),mod=ctx.createOscillator(),mult=ctx.createGain(),level=ctx.createGain();
    carrier.type='sine';carrier.frequency.value=f;mod.type='sine';mod.frequency.value=f*(.5+Math.round(p.wave*8)+p.character*.33);
    mult.gain.value=0;level.gain.value=.64;mod.connect(mult.gain);carrier.connect(mult);mult.connect(level);level.connect(pre);
-   mod.start(t);carrier.start(t);carrier.stop(end+.06);mod.stop(end+.06);voice.pitched.push(carrier,mod);tune(carrier,1);tune(mod,2);
+   startSource(mod);startSource(carrier);voice.pitched.push(carrier,mod);tune(carrier,1);tune(mod,2);
    if(p.second>.02)osc('triangle',f*.5,pre,p.second*.18,3);
   }
   // Every pitched engine has an additive FM input, even outside FM MATRIX mode.
-  if(!voice.modDepth&&voice.pitched.length){const mod=ctx.createOscillator(),depth=ctx.createGain();mod.frequency.value=f*2;depth.gain.value=0;mod.connect(depth);for(const o of voice.pitched)depth.connect(o.frequency);mod.start(t);mod.stop(end+.08);voice.patchFM=depth;tune(mod,2)}
+  if(!voice.modDepth&&voice.pitched.length){const mod=ctx.createOscillator(),depth=ctx.createGain();mod.frequency.value=f*2;depth.gain.value=0;mod.connect(depth);for(const o of voice.pitched)depth.connect(o.frequency);startSource(mod,end+.08);voice.patchFM=depth;tune(mod,2)}
   voice.cv=clawPatchbay.makeAudio(ctx,'texture',{
    'FILTER':{param:f1.detune,scale:2400},'FILTER 2':{param:f2.detune,scale:2400},
    'RESONANCE':{param:f1.Q,scale:8},'RES 2':{param:f2.Q,scale:8},
@@ -308,22 +314,23 @@ class TextureEngine{
    'FM':(voice.modDepth||voice.patchFM)?{param:(voice.modDepth||voice.patchFM).gain,scale:f*2}:null
   },{routes:this.patchRoutes.map(r=>({source:r.source,dest:r.target,depth:r.amount})),rates:this.cvRates()},
    {startAt:t,stopAt:end+.08,sharedSources:this.modulators.getSources()});
-  voice.cv.noteOn(t,length,{attack:.003,decay:.08+(p.buchlaDecay??.5)*2.8,sustain:0,release:.1});
-  this.voices.push(voice);
+  voice.cv.noteOn(t,length,{attack:.003,decay:.08+(p.buchlaDecay??.5)*2.8,sustain:0,release:.1,held});
+  this.voices.push(voice);return voice;
  }
- retireVoices(){const t=this.ctx.currentTime;for(const v of this.voices){v.cv?.dispose();try{v.amp.gain.cancelScheduledValues(t);v.amp.gain.setTargetAtTime(.0001,t,.024)}catch{}}this.voices=[]}
+ releaseVoice(v){if(!v||v.released)return;v.released=true;const t=this.ctx.currentTime,release=.035+this.p.release**2*4;releaseParam(v.amp.gain,t,release);v.cv.noteOff(t);v.end=t+release*3;for(const source of v.sources)stopSource(source,v.end+.06);v.cv.stopAt(v.end+.08)}
+ retireVoices(){const t=this.ctx.currentTime;for(const v of this.voices){v.released=true;v.cv?.dispose();try{v.amp.gain.cancelScheduledValues(t);v.amp.gain.setTargetAtTime(.0001,t,.024);for(const source of v.sources)stopSource(source,t+.15)}catch{}}this.voices=[]}
  dispose(){clearInterval(this._tick);this.modulators.dispose();this.retireVoices();this.fx.input.disconnect();this.fx.wet.disconnect();this.fx.delayWet.disconnect()}
 }
 class AcidEngine{
  constructor(ctx,dest,p){this.ctx=ctx;this.p=p;this.stage=ctx.createGain();this.stage.gain.value=.0001;this.filter1=ctx.createBiquadFilter();this.filter1.type='lowpass';this.filter2=ctx.createBiquadFilter();this.filter2.type='lowpass';this.drive=ctx.createWaveShaper();this.output=ctx.createGain();this.osc=ctx.createOscillator();this.osc.type='sawtooth';this.osc.frequency.value=55;this.osc.connect(this.filter1);this.filter1.connect(this.filter2);this.filter2.connect(this.drive);this.drive.connect(this.stage);this.stage.connect(this.output);this.output.connect(dest);this.osc.start();this.lastNote=null;this.end=0;this.update()}
  update(){let t=this.ctx.currentTime,p=this.p;this.osc.detune.setTargetAtTime(coarseCents(p.coarse1),t,.02);this.osc.type=p.wave==='SQUARE'?'square':'sawtooth';this.filter1.Q.setTargetAtTime(.75+p.res*19,t,.02);this.filter2.Q.setTargetAtTime(.4+p.res*6,t,.02);this.output.gain.setTargetAtTime(p.volume*.33,t,.05);const a=new Float32Array(1024);for(let i=0;i<a.length;i++){let x=i/511.5-1;a[i]=Math.tanh(x*(1+p.drive*13))}this.drive.curve=a}
- note(midi,t,dur,accent=false,slide=false,holdNext=false){const p=this.p,ctx=this.ctx,f=hz(midi),last=this.lastNote||f;this.osc.frequency.cancelScheduledValues(t);this.osc.frequency.setValueAtTime(last,t);if(slide)this.osc.frequency.setTargetAtTime(f,t+.004,.008+p.slide*.22);else this.osc.frequency.setValueAtTime(f,t);
+ note(midi,t,dur,accent=false,slide=false,holdNext=false,held=false){const p=this.p,ctx=this.ctx,f=hz(midi),last=this.lastNote||f;this.osc.frequency.cancelScheduledValues(t);this.osc.frequency.setValueAtTime(last,t);if(slide)this.osc.frequency.setTargetAtTime(f,t+.004,.008+p.slide*.22);else this.osc.frequency.setValueAtTime(f,t);
 const base=ease(p.cutoff,90,1600),peak=Math.min(13000,base*(1+p.env*9+(accent?p.accent*7:0))),decay=.065+p.decay*.72;for(let filt of [this.filter1,this.filter2]){filt.frequency.cancelScheduledValues(t);filt.frequency.setValueAtTime(peak,t);filt.frequency.setTargetAtTime(base,t+.008,decay/(accent?3.6:4))}
 const g=this.stage.gain;g.cancelScheduledValues(t);if(!slide||this.end<t){g.setValueAtTime(.0001,t);g.linearRampToValueAtTime(accent?1.1:.72,t+.008)}else g.setTargetAtTime(accent?1.1:.72,t,.01);
 // Slide is attached to the originating step; sustain the gate into the next note.
  const gate=t+Math.max(.008,dur)*(holdNext?1.08:(slide?.96:.79));
- g.setTargetAtTime(.0001,gate,.028);this.lastNote=f;this.end=gate}
- stop(){this.stage.gain.setTargetAtTime(.0001,this.ctx.currentTime,.025)}
+ if(!held)g.setTargetAtTime(.0001,gate,.028);this.lastNote=f;this.end=held?Infinity:gate}
+ stop(){releaseParam(this.stage.gain,this.ctx.currentTime,.075)}
  dispose(){this.stop();this.osc.stop();this.output.disconnect()}
 }
 INSTRUMENT_PRESETS.texture.push(

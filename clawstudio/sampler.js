@@ -106,5 +106,5 @@ export function createSamplerRack(mount,{getContext,getDestination,getSources,ge
   selected=Math.max(0,Math.min(3,Math.floor(Number(data.selected)||0)));
   refresh();notify('Four reels restored from project · playback remains stopped until you press PLAY');
  }
- return {exportProject,restoreProject,slots,getSelected:()=>selectedSlot(),select:n=>{selected=clamp(Math.floor(n),0,3);refresh()},capture,play:()=>play(selectedSlot()),stop:()=>{slots.forEach(stop);refresh()},init:()=>{ensure();populateSources();refresh()},refreshSources:populateSources,dispose:()=>{cancelCapture();slots.forEach(s=>{stop(s);if(s.chain)Object.values(s.chain).forEach(n=>n.disconnect?.());s.chain=null})}};
+ return {exportProject,restoreProject,slots,triggerSlot:i=>{const slot=slots[i];if(!slot)return ()=>{};play(slot);const source=slot.source;return ()=>{if(slot.source===source){stop(slot);renderSlots()}}},getSelected:()=>selectedSlot(),select:n=>{selected=clamp(Math.floor(n),0,3);refresh()},capture,play:()=>play(selectedSlot()),stop:()=>{slots.forEach(stop);refresh()},init:()=>{ensure();populateSources();refresh()},refreshSources:populateSources,dispose:()=>{cancelCapture();slots.forEach(s=>{stop(s);if(s.chain)Object.values(s.chain).forEach(n=>n.disconnect?.());s.chain=null})}};
 }

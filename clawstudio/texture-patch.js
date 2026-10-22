@@ -1,4 +1,4 @@
-import {clawPatchbay} from './poly-modular.js?v=slow-coarse-20261020';
+import {clawPatchbay} from './poly-modular.js?v=jam-studio-20261022';
 // SPDX-License-Identifier: AGPL-3.0-only
 // Original Buchla-inspired, not a port of vintage hardware firmware.
 export const BUCHLA_SOURCES=['MOD OSC','CYCLE','RANDOM','ENVELOPE','MOTION','S&H'];
