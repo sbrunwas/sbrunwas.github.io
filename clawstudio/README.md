@@ -18,6 +18,10 @@ Fresh sessions use the neutral Afterglow drum settings, no drum sends, and a cle
 
 Auto Transition offers **4, 8 or 16 beats** with gentler recipes and an assignable stereo **Reverb** route. Wet Mix and Intensity control transition processing too. Release fades from the current macro value; reverb tails decay naturally. Older bar-based duration settings migrate to the equivalent beat count.
 
+The **Effect Editor** has independent controls for all eleven effects: retrigger rate/fade, reverse phrase/fade, tape stop time/brake curve, crush bits/sample hold, gate rate/open time, filter cutoff/slope, delay time/feedback, shuffle slice/order, reverb decay/brightness, drive gain/output, and stereo spread/balance. Select an effect in **Edit FX** or click its brush. Settings apply to matching painted steps, holds and transition routes, and save with songs/projects. **Reset This FX** restores only that effect. Wet Mix and Intensity set processing depth.
+
+**Hold Retrig** loops a short forward slice (1/32 note by default); **Hold Reverse** loops a full beat backward. Both freeze the stereo audio captured when pressed, independently of the running sequencer. Reverse phrase lengths extend to four beats. Change the phrase length and press again to capture new audio. **Hold Tape** slows a frozen phrase to silence; **Hold Gate** chops the live input. Releasing a hold returns to the step pattern or dry audio.
+
 ## Copy sequences between instruments
 
 Each rack sequencer has **Copy Sequence From**, **Copy Sequence**, and **Undo Copy**. Choose another instrument to copy its currently selected step pattern into the current destination pattern. Length, notes, accents, slide/overlap, gate and repeats transfer; oscillator, filter, effect and mixer settings stay as they are. Notes retain their absolute pitch across different root settings. Poly chord steps use their lowest voiced note on Mono, Texture or Acid. Copying into Poly selects Step Sequencer playback; copying from Poly uses its step pattern rather than its arpeggiator performance.

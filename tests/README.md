@@ -22,6 +22,8 @@ Set `BASE_URL` for another server port, or `CHROMIUM_BIN` to use an existing Chr
 
 Run `node tests/master-transitions.cjs` for sample-clock transition timing, stereo reverb decay, zero-mix/intensity bypass and release continuity (no browser dependencies). With Playwright installed and the repository-root server running, `node tests/jam-and-transitions.cjs` checks real keyboard audio, typing modes, sampler gates, shortcuts, transition controls, legacy project migration and clean drum settings. `BASE_URL` and `CHROMIUM_BIN` work as above.
 
+Run `node tests/master-gestures.cjs` for forward/reverse sample order, tempo/sample-rate timing, frozen stereo holds independent of sequencer events and ring wrap, release/bypass, and audible DSP changes from every effect parameter. `node tests/master-effects.cjs` uses Playwright to check all 22 controls against the real worklet, held/released pointer gestures, effect reset, song/project persistence and legacy defaults, and mobile control layout. `BASE_URL` and `CHROMIUM_BIN` work as above.
+
 - `/tests/sequence-copy.html`: cross-instrument pitch/chord and timing conversion, deep copies, selected-pattern isolation, drum rhythm conversion, nonstandard lengths, Undo Copy and history reset.
 
 `node tests/sequence-copy.cjs` uses Playwright and the repository-root server to verify real copy controls, preservation of sound parameters and other patterns/lanes, full 64-step visibility, custom lengths through song/patch save/load, and live loop continuity beyond master step 64. Use `BASE_URL` and `CHROMIUM_BIN` as above.

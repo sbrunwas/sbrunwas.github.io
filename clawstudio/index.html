@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>ClawStudio · Rack, Performance Desk & Conductor</title><link rel="stylesheet" href="./bass01.css"><link rel="stylesheet" href="./sampler.css"><link rel="stylesheet" href="./poly-arp.css"><link rel="stylesheet" href="./texture-patch.css"><link rel="stylesheet" href="./harmony.css"><link rel="stylesheet" href="./master-performance.css"><link rel="stylesheet" href="./poly-modular.css?v=additive-cv-20261020"><style>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>ClawStudio · Rack, Performance Desk & Conductor</title><link rel="stylesheet" href="./bass01.css"><link rel="stylesheet" href="./sampler.css"><link rel="stylesheet" href="./poly-arp.css"><link rel="stylesheet" href="./texture-patch.css"><link rel="stylesheet" href="./harmony.css"><link rel="stylesheet" href="./master-performance.css?v=effect-controls-20261022"><link rel="stylesheet" href="./poly-modular.css?v=additive-cv-20261020"><style>
 .claw .rack-mute-toolbar{display:flex;justify-content:flex-end;padding:8px 0}
 .claw .rack-mute-toolbar button{min-width:142px;min-height:40px;font-weight:800;border:1px solid #829a88}
 .claw .rack-mute-toolbar button.is-muted{background:#b66b60;color:#23100c;border-color:#df9b8e}
@@ -117,7 +117,7 @@ import {createKickSidechain,kickAtStep,sidechainTiming} from "./sidechain.js";
 import {HARMONY_DEFAULTS,mountHarmonyPanel,linkHarmony,normalizeHarmony} from "./harmony.js";
 import {validateProject,saveLocalProject,loadLocalProject,projectBlob,saveSong,listSongs,loadSong} from "./project-session.js?v=blank-song-library-20261021";
 import {STARTER_TITLE,installStarterPatterns,buildStarterArrangement} from "./starter-song.js?v=shared-seq-20261021";
-import {createMasterPerformanceFX} from "./master-performance.js?v=musical-transitions-20261022";
+import {createMasterPerformanceFX} from "./master-performance.js?v=effect-controls-20261022";
 const {createConductor}=(()=>{
 // ClawStudio Performance Conductor v0.10 — scenes, 4-track step sequencer,
 // Web MIDI I/O and actual master audio visualization. Original code AGPL-3.0-only.

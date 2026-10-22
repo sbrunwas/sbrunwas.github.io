@@ -1,6 +1,8 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
 const scope={sampleRate:48000,currentTime:0,AudioWorkletProcessor:class{constructor(){this.port={}}},registerProcessor:(_name,Processor)=>scope.Processor=Processor};
-vm.createContext(scope);vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../clawstudio/master-fx-worklet.js'),'utf8'),scope);
+vm.createContext(scope);
+vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../clawstudio/master-fx-parameters.js'),'utf8').replace(/export /g,''),scope);
+vm.runInContext(fs.readFileSync(require('node:path').join(__dirname,'../clawstudio/master-fx-worklet.js'),'utf8').replace(/^import .*;$/m,''),scope);
 const send=(processor,data)=>processor.port.onmessage({data});
 function render({state={},run=null,input=t=>[Math.sin(t*2*Math.PI*220)*.15,Math.sin(t*2*Math.PI*330)*.12],seconds=2,inspect=()=>{}}={}){
  scope.currentTime=0;const p=new scope.Processor();send(p,{type:'state',enabled:true,mix:.45,amount:.4,tempo:120,macro:1,maps:[],...state});if(run)send(p,{type:'run',...run});
