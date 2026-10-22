@@ -108,9 +108,10 @@
 .cs10-plots .cs10-stereo{display:none}@media(min-width:1100px){.cs10-plots{grid-template-columns:1fr 1fr 160px}.cs10-plots .cs10-stereo{display:block}}
 </style><script type="module">
 import {createStudioMaster,createStudioChannel,setChannelTone} from "./studio-mix.js?v=clean-drums-20261022";
+import {mountSequenceCopy,rackSequenceSource} from "./sequence-copy.js?v=sequence-copy-20261022";
 import {mountKeyboardJam} from "./keyboard-jam.js?v=keyboard-jam-20261022";
 import {normalizePolyVoice} from "./poly-voice.js?v=jam-studio-20261022";
-import {createRackInstrument} from "./rack-devices.js?v=jam-studio-20261022";
+import {createRackInstrument} from "./rack-devices.js?v=sequence-copy-20261022";
 import {createSamplerRack} from "./sampler.js?v=jam-studio-20261022";
 import {createKickSidechain,kickAtStep,sidechainTiming} from "./sidechain.js";
 import {HARMONY_DEFAULTS,mountHarmonyPanel,linkHarmony,normalizeHarmony} from "./harmony.js";
@@ -198,7 +199,7 @@ return {createConductor};
 })();
 import {AfterglowAudio} from "./audio.js";
 import {validateState,validateSamples} from "./state.js";
-import {createBass01} from "./bass01.js?v=jam-studio-20261022";
+import {createBass01} from "./bass01.js?v=sequence-copy-20261022";
 (()=>{
 const root=document.getElementById('clawstudio-root');if(root.dataset.loaded)return;root.dataset.loaded='1';
 const $=id=>root.querySelector('#'+id), all=q=>[...root.querySelectorAll(q)],clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));
@@ -206,7 +207,7 @@ const names=['KICK','SNARE','LOW TOM','MID TOM','HIGH TOM','RIM','CLAP','CLOSED 
 const voice=Array.from({length:11},()=>({model:0,tune:0,decay:.5,tone:.5,level:.8,pan:0,drive:0,mute:false,solo:false,reverse:false,sampleStart:0,sampleEnd:1}));
 const patterns=Array.from({length:16},(_,p)=>({length:16,steps:Array.from({length:11},(_,v)=>Array.from({length:64},(_,s)=>({on:false,velocity:v===0?.95:v===7?(s%4===0?.65:.85):.85,probability:1,ratchets:1})))}));
 const drum={bank:{patterns,chain:Array.from({length:64},(_,i)=>i%16),chainLength:4},voices:voice,tempo:124,swing:.12,master:.75,masterDrive:0,selectedPattern:0,chainMode:false,randomEnginePool:[0,1,3,4]};
-let selected=0,selectedStep=0,page=0,clipboard=null,randomUndo=null,sampleSlots=Array(11).fill(null),playing=false,step=0,next=0,interval,ctx,noiseBuffer,drumAudio=null,drumInit=null,rec=false,recChunks=[],recTap=null,fxNodes=null,mode='morph',A={},B={},links=[],conductor=null,keyboardJam=null;
+let selected=0,selectedStep=0,page=0,clipboard=null,randomUndo=null,sampleSlots=Array(11).fill(null),playing=false,step=0,next=0,interval,ctx,noiseBuffer,drumAudio=null,drumInit=null,rec=false,recChunks=[],recTap=null,fxNodes=null,mode='morph',A={},B={},links=[],conductor=null,keyboardJam=null,sequenceCopyPanels=[];
 const defs=[['drums','DRUM MACHINE','A','#d0b783'],['acid','MONO','B','#b0d7ba'],['poly','POLY','B','#809dd2'],['texture','TEXTURE','B','#e3d04b'],['tb303','ACID','A','#d0d1c9'],['sample','SAMPLER','A','#cfaed2'],['external','EXT IN','A','#a5b9aa']];
 let masterColor='CLEAN';
 const channels=Object.fromEntries(defs.map(([id,name,bus,color])=>[id,{id,name,bus,color,mute:false,solo:false,v:{hi:.5,hm:.5,lm:.5,low:.5,cut:1,res:0,delay:id==='acid'||id==='drums'?0:.05,reverb:id==='acid'||id==='drums'?0:id==='texture'?.35:.1,level:id==='external'?0:id==='drums'?1:.6},sc:false,nodes:null}]));
@@ -291,7 +292,7 @@ function refreshRackDials(){for(let group of ['voice','step']){let defs=group===
 function renderRack(){let r=$('c-grid');r.innerHTML='';for(let rowStart=0;rowStart<patterns[drum.selectedPattern].length;rowStart+=16){let cap=document.createElement('div');cap.className='rrow';cap.innerHTML='<span class="small">INSTRUMENT / STEP</span>'+Array.from({length:16},(_,i)=>'<span class="small" style="text-align:center">'+String(rowStart+i+1).padStart(2,'0')+'</span>').join('');r.append(cap);
 let solo=voice.some(x=>x.solo);for(let v=0;v<11;v++){let row=document.createElement('div');row.className='rrow';let lane=document.createElement('div');lane.className='lane';let name=document.createElement('button');name.className='name'+(v===selected?' sel':'');name.innerHTML='<span>'+names[v]+'</span><span class="enginepill">'+({0:'909',1:'808',2:'SMP',3:'LIN',4:'PER'}[voice[v].model])+'</span>';name.onclick=()=>{selected=v;renderRack();renderVoice()};lane.append(name);for(const [p,l] of [['mute','M'],['solo','S']]){let b=document.createElement('button');b.className='mini'+(voice[v][p]?' lit-'+p:'');b.textContent=l;b.setAttribute('aria-label',p+' '+names[v]);b.onclick=()=>{voice[v][p]=!voice[v][p];syncDrums();renderRack();renderVoice()};lane.append(b)}let rand=document.createElement('button');rand.className='mini rnd';rand.textContent='RND';rand.title='Randomize only this lane';rand.onclick=()=>randomLane(v);lane.append(rand);row.append(lane);
 for(let s=0;s<Math.min(16,patterns[drum.selectedPattern].length-rowStart);s++){let abs=rowStart+s,cell=patterns[drum.selectedPattern].steps[v][abs];let b=document.createElement('button');b.className='step'+(s%4===0?' beat':'')+(cell.on?' on':'')+(v===selected&&abs===selectedStep?' selected':'');b.dataset.step=abs;b.setAttribute('aria-label',names[v]+' step '+(abs+1)+' '+(cell.on?'on':'off'));b.innerHTML=cell.on&&cell.ratchets>1?'<span class="ratchet">'+cell.ratchets+'</span>':'';if(abs>=patterns[drum.selectedPattern].length)b.style.opacity='.35';let held=false,timeout;b.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'){held=false;timeout=setTimeout(()=>{held=true;selected=v;selectedStep=abs;renderRack();renderVoice()},600)}});b.addEventListener('pointerup',()=>clearTimeout(timeout));b.addEventListener('pointercancel',()=>clearTimeout(timeout));b.onclick=e=>{if(held){held=false;return}selected=v;selectedStep=abs;if(!e.shiftKey)cell.on=!cell.on;syncDrums();renderRack();renderVoice()};b.oncontextmenu=e=>{e.preventDefault();selected=v;selectedStep=abs;renderRack();renderVoice()};row.append(b)}r.append(row)}
-}$('c-length').value=patterns[drum.selectedPattern].length}
+}$('c-length').value=patterns[drum.selectedPattern].length;sequenceCopyPanels.forEach(panel=>panel.refresh())}
 function renderVoice(){let v=voice[selected];$('c-voice-title').textContent='VOICE '+String(selected+1).padStart(2,'0')+' · '+names[selected];$('c-model').value=v.model;$('c-voicemute').classList.toggle('toggle-on',v.mute);$('c-voicesolo').classList.toggle('toggle-on',v.solo);$('c-reverse').classList.toggle('toggle-on',v.reverse);$('c-soundrand').disabled=v.model===2;
 $('c-step-title').textContent='STEP INSPECTOR · '+String(selectedStep+1).padStart(2,'0');$('c-step-target').textContent=names[selected]+' · '+String(selectedStep+1).padStart(2,'0');$('c-step-on').textContent=currentStep().on?'STEP ON':'STEP OFF';$('c-step-on').classList.toggle('toggle-on',currentStep().on);$('c-sample-info').textContent=sampleSlots[selected]?.name||'No custom sample · up to 10 sec, loaded locally';$('c-chainmode').textContent='SONG CHAIN: '+(drum.chainMode?'ON':'OFF');$('c-chainmode').classList.toggle('toggle-on',drum.chainMode);refreshRackDials()}
 function rememberUndo(){randomUndo={patterns:clone(patterns),voices:clone(voice)};}
@@ -369,7 +370,7 @@ function tick(){
     if(!keyboardJam?.isHeld('bass'))bass01.scheduleStep(step,when,duration);
     for(const [type,module] of Object.entries(extraRacks))if(type!=='acid'||!keyboardJam?.isHeld('acid'))module.scheduleStep(step,when,duration);
     extraNotes(when,step%16);
-    step=(step+1)%64;
+    step++;
     next+=unit;
   }
 }
@@ -661,6 +662,7 @@ async function restoreProject(packageData){
  }
  $('c-bpm').value=drum.tempo;
  refreshMuteAllButtons();
+ sequenceCopyPanels.forEach(panel=>panel.reset());
  $('c-status').textContent='Full project restored · audio reels loaded · press JAM to play';
 }
 let projectBackupArmed=false,projectSaving=false;
@@ -750,6 +752,18 @@ keyboardJam=mountKeyboardJam($('c-keyboard-host'),{
  onMute:target=>{const id={drum:'drums',bass:'acid',poly:'poly',texture:'texture',acid:'tb303',sampler:'sample'}[target];channels[id].el.querySelector('.mute').click()},
  onError:error=>{$('c-status').textContent='Keyboard: '+error.message}
 });
+const sequenceSources=[
+ rackSequenceSource('mono','MONO',bass01,'mono'),rackSequenceSource('poly','POLY',extraRacks.poly,'poly'),
+ rackSequenceSource('texture','TEXTURE',extraRacks.texture,'texture'),rackSequenceSource('acid','ACID',extraRacks.acid,'acid'),
+ {id:'drums',label:()=> 'DRUMS · '+names[selected]+' · P'+String(drum.selectedPattern+1).padStart(2,'0'),
+  snapshot:()=>({kind:'drum',poly:false,root:0,pattern:drum.selectedPattern,length:patterns[drum.selectedPattern].length,cells:structuredClone(patterns[drum.selectedPattern].steps[selected]),lane:selected}),
+  apply(sequence){drum.selectedPattern=sequence.pattern;selected=sequence.lane;patterns[sequence.pattern].length=sequence.length;patterns[sequence.pattern].steps[sequence.lane]=structuredClone(sequence.cells);selectedStep=Math.min(selectedStep,sequence.length-1);$('c-pat').value=drum.selectedPattern;syncDrums();renderRack();renderVoice()}}
+];
+for(const source of sequenceSources){
+ const host=source.id==='drums'?$('c-drum-pane'):$( {mono:'c-bass-mount',poly:'c-poly-mount',texture:'c-texture-mount',acid:'c-acid-mount'}[source.id]).querySelector('.shared-sequencer');
+ const controls=document.createElement('div'),header=source.id==='drums'?host.querySelector('.topline'):host.querySelector('.seq-header');header.insertAdjacentElement('afterend',controls);sequenceCopyPanels.push(mountSequenceCopy(controls,source,()=>sequenceSources));
+}
+root.addEventListener('change',event=>{if(['b01-file','cri-loadfile','c-kit-file'].includes(event.target.id))sequenceCopyPanels.forEach(panel=>panel.reset());else if(['b01-pattern','cri-pattern'].includes(event.target.id)||event.target.matches('[data-seq-mode]'))sequenceCopyPanels.forEach(panel=>panel.refresh())});
 const blankProject=captureProject();
 let activeSongId=null,activeSongName='',activeChoice='blank',savedFingerprint='';
 const fingerprint=(source=captureProject())=>{const project={...source};delete project.savedAt;return JSON.stringify(project)};

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Shared note sequencing and editing for the four synthesis racks.
 export const LENGTHS=[4,8,16,32,48,64];
+export const isSequenceLength=value=>Number.isInteger(value)&&value>=1&&value<=64;
 export const CHORDS=Object.freeze({SINGLE:[0],MAJOR:[0,4,7],MINOR:[0,3,7],DIMINISHED:[0,3,6],AUGMENTED:[0,4,8],SUS2:[0,2,7],SUS4:[0,5,7],POWER:[0,7],MAJ7:[0,4,7,11],MIN7:[0,3,7,10],DOM7:[0,4,7,10]});
 const clamp=(v,a,b,fallback=a)=>Math.max(a,Math.min(b,Number.isFinite(Number(v))?Number(v):fallback));
 export const midiName=n=>['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'][n%12]+(Math.floor(n/12)-1);
@@ -11,7 +12,7 @@ export function normalizeStep(step={}){
  s.inversion=Math.round(clamp(s.inversion,0,s.chord.length-1,0));return s;
 }
 export function normalizeBank(state){
- state.root=Math.round(clamp(state.root,0,127,48));state.pattern=Math.round(clamp(state.pattern,0,7,0));if(!LENGTHS.includes(state.steps))state.steps=16;
+ state.root=Math.round(clamp(state.root,0,127,48));state.pattern=Math.round(clamp(state.pattern,0,7,0));if(!isSequenceLength(state.steps))state.steps=16;
  if(!Array.isArray(state.patterns))state.patterns=[];
  for(let p=0;p<8;p++){if(!Array.isArray(state.patterns[p]))state.patterns[p]=[];for(let i=0;i<64;i++)state.patterns[p][i]=normalizeStep(state.patterns[p][i])}
 }
@@ -42,7 +43,7 @@ export function attachStepSequencer(host,state,{type,prefix,onChange=()=>{},onSe
  const current=()=>normalizeStep(state.patterns[state.pattern][selected]);
  function changed(){onChange();refresh()}
  function select(index){selected=Math.max(0,Math.min(state.steps-1,index));onSelect(selected)}
- function refresh(){normalizeBank(state);select(selected);const step=current();id('pattern').value=state.pattern;id('length').value=state.steps;id('root').value=state.root;id('selected').textContent=String(selected+1).padStart(2,'0');
+ function refresh(){normalizeBank(state);select(selected);id('length').querySelector('[data-custom-length]')?.remove();if(!LENGTHS.includes(state.steps)){const option=document.createElement('option');option.value=state.steps;option.textContent=state.steps+' · CUSTOM';option.dataset.customLength='';id('length').append(option)}const step=current();id('pattern').value=state.pattern;id('length').value=state.steps;id('root').value=state.root;id('selected').textContent=String(selected+1).padStart(2,'0');
   const arp=poly&&state.polyArp?.enabled;if(poly)$('[data-seq-mode]').value=arp?'arp':'steps';$('.seq-mode-message').textContent=arp?'ARPEGGIATOR is playing. Choose STEP SEQUENCER above to hear the notes below.':'';
   const rows=$('.seq-rows');rows.replaceChildren();
   for(let start=0;start<state.steps;start+=16){const row=document.createElement('section');row.className='seq-row';if(state.steps<=8)row.style.minWidth='0';row.setAttribute('aria-label',`Steps ${start+1}–${Math.min(start+16,state.steps)}`);const range=document.createElement('span');range.className='seq-range';range.textContent=`${String(start+1).padStart(2,'0')}–${String(Math.min(start+16,state.steps)).padStart(2,'0')}`;const grid=document.createElement('div');grid.className='seq-grid';grid.style.setProperty('--seq-cols',Math.min(16,state.steps-start));

@@ -17,3 +17,9 @@ Open **Key Map** for labeled pads that also work with a pointer. Browser Ctrl/Co
 Fresh sessions use the neutral Afterglow drum settings, no drum sends, and a clean master. **Clean Afterglow Sound** restores this routing for an existing song while retaining its drum voices and patterns; it also bypasses master glitch FX and heat. Desk → **Master Sound** offers the previous **Glue** compression. Older projects retain their saved processing.
 
 Auto Transition offers **4, 8 or 16 beats** with gentler recipes and an assignable stereo **Reverb** route. Wet Mix and Intensity control transition processing too. Release fades from the current macro value; reverb tails decay naturally. Older bar-based duration settings migrate to the equivalent beat count.
+
+## Copy sequences between instruments
+
+Each rack sequencer has **Copy Sequence From**, **Copy Sequence**, and **Undo Copy**. Choose another instrument to copy its currently selected step pattern into the current destination pattern. Length, notes, accents, slide/overlap, gate and repeats transfer; oscillator, filter, effect and mixer settings stay as they are. Notes retain their absolute pitch across different root settings. Poly chord steps use their lowest voiced note on Mono, Texture or Acid. Copying into Poly selects Step Sequencer playback; copying from Poly uses its step pattern rather than its arpeggiator performance.
+
+The Drum Machine uses its selected lane: copies to synths turn its hits into root-note gates; copies into drums transfer rhythm, accents and repeats into the selected lane and set that pattern’s length. Nonstandard drum lengths such as 30 steps remain exact when copied to synths. Undo Copy restores the previous pattern and length. Loading a project or patch clears this copy history.
