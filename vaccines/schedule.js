@@ -2,24 +2,24 @@
  * This is a visit reference, not a dose-history or catch-up calculator. */
 (function (root) {
   'use strict';
-  const vis = 'https://www.cdc.gov/vaccines/hcp/vis/vis-statements/';
+  const vis = 'https://www.cdc.gov/vaccines/hcp/current-vis/';
   const vaccines = {
-    hepb: { code: 'HepB', name: 'Hepatitis B', page: 'hep-b', color: '#b6d4b9' },
-    rsv: { code: 'RSV', name: 'Respiratory syncytial virus', page: 'rsv-immunization-infants', color: '#e4bb89' },
+    hepb: { code: 'HepB', name: 'Hepatitis B', page: 'hepatitis-b', color: '#b6d4b9' },
+    rsv: { code: 'RSV', name: 'Respiratory syncytial virus', page: 'rsv-iis', color: '#e4bb89' },
     dtap: { code: 'DTaP', name: 'Diphtheria, tetanus & pertussis', page: 'dtap', color: '#79aeca' },
-    ipv: { code: 'IPV', name: 'Polio', page: 'ipv', color: '#d795b1' },
+    ipv: { code: 'IPV', name: 'Polio', page: 'polio', color: '#d795b1' },
     hib: { code: 'Hib', name: 'Haemophilus influenzae type b', page: 'hib', color: '#dc9483' },
-    pcv: { code: 'PCV', name: 'Pneumococcal disease', page: 'pcv', color: '#72b7ab' },
+    pcv: { code: 'PCV', name: 'Pneumococcal disease', page: 'pneumococcal-conjugate', color: '#72b7ab' },
     rv: { code: 'RV', name: 'Rotavirus', page: 'rotavirus', color: '#9dbed5' },
-    hepa: { code: 'HepA', name: 'Hepatitis A', page: 'hep-a', color: '#ccb482' },
+    hepa: { code: 'HepA', name: 'Hepatitis A', page: 'hepatitis-a', color: '#ccb482' },
     mmr: { code: 'MMR', name: 'Measles, mumps & rubella', page: 'mmr', color: '#9d96bf' },
     varicella: { code: 'VAR', name: 'Chickenpox (varicella)', page: 'varicella', color: '#b0a6c5' },
     hpv: { code: 'HPV', name: 'Human papillomavirus', page: 'hpv', color: '#9ebd88' },
-    menacwy: { code: 'MenACWY', name: 'Meningococcal ACWY', page: 'mening', color: '#9ebd88' },
+    menacwy: { code: 'MenACWY', name: 'Meningococcal ACWY', page: 'meningococcal-acwy', color: '#9ebd88' },
     tdap: { code: 'Tdap', name: 'Tetanus, diphtheria & pertussis', page: 'tdap', color: '#9ebd88' },
-    menb: { code: 'MenB', name: 'Meningococcal B', page: 'mening-serogroup', color: '#9ebd88' },
+    menb: { code: 'MenB', name: 'Meningococcal B', page: 'meningococcal-b', color: '#9ebd88' },
     covid19: { code: 'COVID-19', name: 'COVID-19', page: 'covid-19', color: '#a1c6c9' },
-    flu: { code: 'Flu', name: 'Influenza', page: 'flu', color: '#b6d4b9' }
+    flu: { code: 'Flu', name: 'Influenza', page: 'influenza-inactivated', color: '#b6d4b9' }
   };
   const notes = [
     'HepB: give monovalent vaccine within 24 hours of birth for stable infants weighing at least 2 kg. See the full schedule for other infants.',

@@ -23,7 +23,8 @@
     if (dose.timing) node.append(el('p', 'timing', dose.timing));
     if (dose.condition) node.append(el('p', 'card-note', dose.condition + '.'));
     dose.refs.forEach(ref => node.append(el('p', 'card-note', notes[ref - 1])));
-    const link = el('a', '', dose.id === 'rsv' ? 'Read CDC information sheet ↗' : 'Read CDC VIS ↗');
+    const label = dose.id === 'rsv' ? 'Read CDC information sheet ↗' : dose.id === 'flu' ? 'Read inactivated flu VIS ↗' : 'Read CDC VIS ↗';
+    const link = el('a', '', label);
     link.href = vis + vaccine.page + '.html';
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
