@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#163f3b">
+  <meta name="description" content="Explore routine well-child vaccine timing using the CDPH 2025 reference chart, with dose conditions and CDC information sheets.">
+  <title>Well-Child Vaccine Timing · CDPH 2025</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="schedule.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#results">Skip to vaccine reference</a>
+  <div class="shell">
+    <nav class="topbar" aria-label="Site navigation">
+      <a href="https://sbrunwas.github.io/" class="wordmark"><span class="mark" aria-hidden="true">+</span> Sam Brunwasser</a>
+      <a href="#source">Source &amp; notes <span aria-hidden="true">↗</span></a>
+    </nav>
+    <header class="hero">
+      <p class="eyebrow">A well-child visit companion</p>
+      <h1>Well-child<br><span>vaccine timing.</span></h1>
+      <p class="intro">Find the vaccines listed for a routine visit, understand the timing, and open the information sheets.</p>
+      <span class="edition">California · CDPH 2025 reference</span>
+    </header>
+    <main>
+      <section class="age-panel" aria-labelledby="age-heading">
+        <div class="panel-heading"><span class="step">01</span><h2 id="age-heading">Choose an age</h2></div>
+        <div class="input-row">
+          <div class="field"><label for="age">Age</label><input id="age" type="number" min="0" step="1" value="2" inputmode="numeric" aria-describedby="age-help"></div>
+          <div class="field"><label for="unit">Unit</label><select id="unit"><option value="months">Months</option><option value="years">Years</option></select></div>
+          <label class="toggle"><input id="ongoing" type="checkbox" checked><span>Include ongoing / seasonal<span class="subtle">From 6 months of age</span></span></label>
+        </div>
+        <p id="age-help" class="helper">Use a whole number, or select a routine visit below.</p>
+        <div id="quick-ages" class="quick-ages" role="group" aria-label="Routine visit ages"></div>
+      </section>
+      <section id="results" aria-labelledby="results-heading" aria-live="polite" aria-atomic="true"></section>
+      <section class="source" id="source" aria-labelledby="source-heading">
+        <p class="eyebrow">Keep the context close</p>
+        <h2 id="source-heading">The chart behind the cards</h2>
+        <p>Based on the supplied California Department of Public Health <strong>Routine Immunization Timing 2025</strong>, IMM-395 (8/25). This is a suggested timing reference, not a patient-specific determination of which doses are due. Review prior doses, products, intervals, eligibility, and current guidance before clinical use.</p>
+        <div class="source-links"><a href="cdph-imm-395-2025.png" target="_blank" rel="noopener noreferrer">View supplied 2025 chart ↗</a><a href="https://eziz.org/assets/docs/IMM-395.pdf" target="_blank" rel="noopener noreferrer">CDPH online chart (may be updated) ↗</a><a href="https://www.cdc.gov/vaccines/hcp/imz-schedules/child-adolescent-notes.html" target="_blank" rel="noopener noreferrer">CDC schedule notes ↗</a></div>
+        <details><summary>Read all 15 notes from the supplied chart</summary><ol id="source-notes"></ol></details>
+      </section>
+    </main>
+    <footer><span>Well-Child Vaccine Timing</span><span>Age stays in your browser. No patient records are stored.</span></footer>
+  </div>
+  <noscript><p class="no-script">Enable JavaScript to use the age lookup, or <a href="cdph-imm-395-2025.png">view the supplied chart</a>.</p></noscript>
+</body>
+</html>
