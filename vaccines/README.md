@@ -15,7 +15,8 @@ versioned to this chart, not represented as current-year guidance. The online PD
 - Ongoing COVID-19 and flu references from 6 months, even outside exact routine visits.
 - Conditional RSV reference below 8 months; optional HPV start at age 9.
 - No dose-history, catch-up, eligibility, or patient-specific due-dose calculation.
-- No API keys, backend, analytics, cookies, or stored patient data.
+- No API keys, backend, cookies, or stored patient data. Optional aggregate page-view
+  analytics on the public GitHub host never read the age controls; the private Sites host is excluded.
 
 ## Hosting
 

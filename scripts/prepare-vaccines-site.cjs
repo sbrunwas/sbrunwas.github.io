@@ -9,6 +9,9 @@ const target = path.resolve(destination);
 if (target === root || target === source || source.startsWith(target + path.sep) || target.startsWith(source + path.sep)) throw new Error('Use a separate staging directory.');
 fs.mkdirSync(path.join(target, 'dist'), { recursive: true });
 fs.mkdirSync(path.join(target, '.openai'), { recursive: true });
+fs.mkdirSync(path.join(target, 'dist/assets/js'), { recursive: true });
+fs.copyFileSync(path.join(root, 'assets/js/site-analytics.js'), path.join(target, 'dist/assets/js/site-analytics.js'));
+// The loader only counts sbrunwas.github.io; the private Sites host stays excluded.
 for (const file of ['index.html', 'styles.css', 'schedule.js', 'app.js', 'cdph-imm-395-2025.png']) {
   fs.copyFileSync(path.join(source, file), path.join(target, 'dist', file));
 }
