@@ -43,6 +43,15 @@
       script.referrerPolicy = 'no-referrer';
       script.onload = function () {
         if (!window.goatcounter || typeof window.goatcounter.count !== 'function') return;
+        // GoatCounter also adds the raw query as a separate `q` field for campaign
+        // handling. Remove that field as well as using our query-free page path.
+        const getData = window.goatcounter.get_data;
+        if (typeof getData !== 'function') return;
+        window.goatcounter.get_data = function (vars) {
+          const data = getData(vars);
+          delete data.q;
+          return data;
+        };
         const count = data => {
           try { window.goatcounter.count(data); } catch (_) { /* Metrics must never disrupt the site. */ }
         };

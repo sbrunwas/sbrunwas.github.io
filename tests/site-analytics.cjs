@@ -5,7 +5,7 @@ const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../assets/js/site-analytics.js'), 'utf8');
 
 async function load(options = {}) {
-  const requests = [], scripts = [], counts = [], handlers = {};
+  const requests = [], scripts = [], counts = [], wireData = [], handlers = {};
   class Element {
     constructor(eventName) { this.eventName = eventName; }
     closest() { return this; }
@@ -33,10 +33,15 @@ async function load(options = {}) {
   if (scripts.length) {
     assert.equal(window.goatcounter.no_onload, true);
     assert.equal(window.goatcounter.no_events, true);
-    window.goatcounter.count = value => counts.push(JSON.parse(JSON.stringify(value)));
+    // The actual SDK adds a separate raw-query field, independently of `path`.
+    window.goatcounter.get_data = value => ({ ...value, q: window.location.search });
+    window.goatcounter.count = value => {
+      counts.push(JSON.parse(JSON.stringify(value)));
+      wireData.push(window.goatcounter.get_data(value));
+    };
     scripts[0].onload();
   }
-  return { requests, scripts, counts, handlers, Element, context };
+  return { requests, scripts, counts, wireData, handlers, Element, context };
 }
 
 (async () => {
@@ -60,6 +65,7 @@ async function load(options = {}) {
   home.handlers.click({ target: new home.Element('patient=secret') });
   assert.equal(home.counts.length, 2, 'Unrecognised events must not transmit arbitrary labels');
   assert.ok(!JSON.stringify([...home.counts, ...active.counts]).includes('secret'));
+  assert.ok(!JSON.stringify([...home.wireData, ...active.wireData]).includes('secret'), 'Provider payload must omit its separate raw query field');
 
   for (const code of ['', '../invalid', 'https://example.com', 'UPPER', 'x'.repeat(64)]) {
     const result = await load({ code });
