@@ -110,13 +110,17 @@
       announcement.textContent = 'Showing ' + studies[studyId].title + '.';
       currentStudy = studyId;
     }
-    if (graphLink && !root.contains(document.activeElement)) {
-      // The evidence card above this section can change height on the same navigation.
+    if (graphLink || location.hash === '#vaccine-impact') {
+      // Let the matching evidence card finish laying out above the graph first.
       const fragment = location.hash;
       requestAnimationFrame(() => {
-        if (location.hash !== fragment || root.contains(document.activeElement)) return;
-        root.scrollIntoView();
-        root.focus({preventScroll: true});
+        if (location.hash !== fragment) return;
+        const inExplorer = root.contains(document.activeElement);
+        const top = root.getBoundingClientRect().top;
+        if (!inExplorer || top < 0 || top > 64) {
+          root.scrollIntoView({behavior: 'instant', block: 'start'});
+        }
+        if (!inExplorer) root.focus({preventScroll: true});
       });
     }
   }
@@ -126,5 +130,7 @@
     location.hash = 'impact-' + vaccinePicker.value + '/' + outcomePicker.value;
   });
   window.addEventListener('hashchange', render);
+  // Deferred scripts can render on separate frames while the page is downloading.
+  document.addEventListener('DOMContentLoaded', render, {once: true});
   render();
 })();
