@@ -7,6 +7,7 @@
   <meta name="description" content="Explore routine well-child vaccine timing using the CDPH 2025 reference chart, with dose conditions and CDC information sheets.">
   <title>Well-Child Vaccine Timing · CDPH 2025</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="tools.css">
   <script src="schedule.js" defer></script>
   <script src="app.js" defer></script>
 <script defer src="/assets/js/site-analytics.js"></script>
@@ -21,9 +22,10 @@
     <header class="hero">
       <p class="eyebrow">A well-child visit companion</p>
       <h1>Well-child<br><span>vaccine timing.</span></h1>
-      <p class="intro">Find the vaccines listed for a routine visit, understand the timing, and open the information sheets.</p>
+      <p class="intro">Look up a routine visit, check an individual vaccine record, or explore the evidence behind each immunization.</p>
       <span class="edition">California · CDPH 2025 reference</span>
     </header>
+    <nav class="tool-nav" aria-label="Vaccine tools"><a href="index.html" aria-current="page">Routine visits</a><a href="planner.html">Catch-up planner</a><a href="evidence.html">Vaccine evidence</a></nav>
     <main>
       <section class="age-panel" aria-labelledby="age-heading">
         <div class="panel-heading"><span class="step">01</span><h2 id="age-heading">Choose an age</h2></div>
@@ -40,7 +42,7 @@
         <p class="eyebrow">Keep the context close</p>
         <h2 id="source-heading">The chart behind the cards</h2>
         <p>Based on the supplied California Department of Public Health <strong>Routine Immunization Timing 2025</strong>, IMM-395 (8/25). This is a suggested timing reference, not a patient-specific determination of which doses are due. Review prior doses, products, intervals, eligibility, and current guidance before clinical use.</p>
-        <div class="source-links"><a href="cdph-imm-395-2025.png" target="_blank" rel="noopener noreferrer">View supplied 2025 chart ↗</a><a href="https://eziz.org/assets/docs/IMM-395.pdf" target="_blank" rel="noopener noreferrer">CDPH online chart (may be updated) ↗</a><a href="https://www.cdc.gov/vaccines/hcp/imz-schedules/child-adolescent-notes.html" target="_blank" rel="noopener noreferrer">CDC schedule notes ↗</a></div>
+        <div class="source-links"><a href="cdph-imm-395-2025.png" target="_blank" rel="noopener noreferrer">View supplied 2025 chart ↗</a><a href="https://eziz.cdph.ca.gov/training/resources/recs/" target="_blank" rel="noopener noreferrer">Current CDPH schedules ↗</a><a href="https://www.cdc.gov/vaccines/hcp/imz-schedules/child-adolescent-notes.html" target="_blank" rel="noopener noreferrer">CDC schedule notes ↗</a></div>
         <details><summary>Read all 15 notes from the supplied chart</summary><ol id="source-notes"></ol></details>
       </section>
     </main>

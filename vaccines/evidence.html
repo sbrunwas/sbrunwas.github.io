@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#163f3b">
+  <meta name="referrer" content="no-referrer">
+  
+  <meta name="description" content="Explore what each immunization prevents, what families can expect afterward, and what researchers actually measured.">
+  <title>Vaccine evidence · Well-Child Vaccine Timing</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="tools.css">
+  <link rel="stylesheet" href="impact.css">
+  <script src="schedule.js" defer></script>
+  <script src="vaccine-evidence.js" defer></script>
+  <script src="evidence.js" defer></script>
+  <script src="impact.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to vaccine evidence</a>
+  <div class="shell">
+    <nav class="topbar" aria-label="Site navigation"><a href="https://sbrunwas.github.io/" class="wordmark"><span class="mark" aria-hidden="true">+</span> Sam Brunwasser</a><a href="index.html">Well-child vaccine timing</a></nav>
+    <header class="hero"><p class="eyebrow">For families & clinicians</p><h1>Vaccine <span>evidence.</span></h1><p class="intro">Explore what each immunization prevents, what families can expect afterward, and what researchers actually measured.</p></header>
+    <nav class="tool-nav" aria-label="Vaccine tools"><a href="index.html">Routine visits</a><a href="planner.html">Catch-up planner</a><a href="evidence.html" aria-current="page">Vaccine evidence</a></nav>
+    <main id="main">
+
+      <div class="library-layout">
+        <aside class="library-index" aria-label="Choose an immunization"><label class="library-label" for="evidence-choice">Choose an immunization</label><select id="evidence-choice"></select><nav id="evidence-links" aria-label="Immunizations"></nav></aside>
+        <div id="evidence-content" class="evidence-content" aria-live="polite"></div>
+      </div>
+      <section id="vaccine-impact" aria-label="Disease trends"></section>
+      <section class="source"><h2>Reading the numbers</h2><p>Percentages describe the people, product, dose and time window in each study. Symptoms recorded after vaccination can also occur in comparison groups. A relative reduction in risk and the number of events per 100,000 people answer different questions. Each graph labels its measure and links to the original data.</p><p>Clinical and family guidance draws first on the American Academy of Pediatrics and the California Department of Public Health. Numerical findings come from original studies, trial results in prescribing information, and disease surveillance. Sources checked November 19, 2026.</p></section>
+      <noscript><p class="message">Enable JavaScript to explore individual studies, or read the <a href="https://www.aap.org/IZFactSheets">AAP immunization fact sheets</a>.</p></noscript>
+    </main>
+    <footer><span>Well-Child Vaccine Timing</span><a href="index.html">Back to routine visits</a></footer>
+  </div>
+</body>
+</html>

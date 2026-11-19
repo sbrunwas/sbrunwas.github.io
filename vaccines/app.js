@@ -29,7 +29,9 @@
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     link.setAttribute('aria-label', 'Read CDC information sheet: ' + vaccine.name);
-    node.append(link);
+    const evidence = el('a', 'evidence-link', 'Benefits, side effects & studies →');
+    evidence.href = 'evidence.html#' + dose.id;
+    node.append(evidence, link);
     return node;
   }
   function group(title, doses) {

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#163f3b">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'none'; form-action 'none'; base-uri 'none'; object-src 'none'">
+  <meta name="description" content="Check an individual record against a proposed visit date. See which doses meet timing rules, what has to wait, and why.">
+  <title>Catch-up planner · Well-Child Vaccine Timing</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="tools.css">
+  
+  <script src="planner-rules.js" defer></script>
+  <script src="planner-forecast.js" defer></script>
+  <script src="planner.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to catch-up planner</a>
+  <div class="shell">
+    <nav class="topbar" aria-label="Site navigation"><a href="https://sbrunwas.github.io/" class="wordmark"><span class="mark" aria-hidden="true">+</span> Sam Brunwasser</a><a href="index.html">Well-child vaccine timing</a></nav>
+    <header class="hero"><p class="eyebrow">Birth through 18 years · AAP 2026</p><h1>Catch-up <span>planner.</span></h1><p class="intro">Check an individual record against a proposed visit date. See which doses meet timing rules, what has to wait, and why.</p></header>
+    <nav class="tool-nav" aria-label="Vaccine tools"><a href="index.html">Routine visits</a><a href="planner.html" aria-current="page">Catch-up planner</a><a href="evidence.html">Vaccine evidence</a></nav>
+    <main id="main">
+
+      <form id="planner-form" class="tool-panel" autocomplete="off" novalidate>
+        <div class="section-heading"><h2>Plan a visit</h2><button type="button" id="start-over" class="quiet">Clear patient</button></div>
+        <p class="privacy">Enter dates only. Patient details stay in this tab and clear on reload.</p>
+        <div class="form-grid">
+          <div class="field"><label for="age-mode">Use</label><select id="age-mode"><option value="dob">Date of birth</option><option value="days">Exact age in days at visit</option></select></div>
+          <div class="field" id="dob-field"><label for="dob">Date of birth</label><input id="dob" type="date" required></div>
+          <div class="field" id="days-field" hidden><label for="age-days">Age in days at visit</label><input id="age-days" type="number" step="1" min="0" max="6940" inputmode="numeric" disabled></div>
+          <div class="field"><label for="visit-date">Visit date to check</label><input id="visit-date" type="date" required></div>
+        </div>
+        <div class="form-section">
+          <h3>Immunization record</h3>
+          <p class="field-help">Use dated doses from the chart, vaccine card, or registry. A combination product counts toward each of its components.</p>
+          <div class="field wide"><label for="record-type">What history is available?</label><select id="record-type" required><option value="">Choose record status</option><option value="known">I can enter the complete dated record</option><option value="none">Confirmed, no prior doses</option><option value="unknown">Missing or uncertain records</option></select></div>
+          <div id="history-editor" hidden>
+            <div id="history-rows"></div>
+            <button type="button" id="add-row" class="secondary">+ Add a dose</button>
+          </div>
+        </div>
+        <div class="form-section">
+          <h3>Clinical factors</h3>
+          <p class="field-help" id="clinical-help">Check for pregnancy, immunocompromise, asplenia or other high-risk conditions, prior intussusception, severe allergy to a vaccine component, moderate or severe acute illness, recent immune globulin or blood products, travel or outbreak exposure, and prior disease or laboratory evidence of immunity. For HepB, also check birth weight under 2,000 g and positive or unknown maternal hepatitis B status. Use clinician review for foreign records (including oral polio vaccine), nonstandard products or schedules.</p>
+          <div class="field wide"><label for="clinical-status">Does any factor apply?</label><select id="clinical-status" aria-describedby="clinical-help" required><option value="">Choose clinical context</option><option value="routine">None identified</option><option value="special">One or more apply, or I’m unsure</option></select></div>
+          <fieldset id="clinical-factors" hidden><legend>Which factors apply?</legend>
+            <label><input type="checkbox" value="travel"> Travel, outbreak or recent exposure</label>
+            <label><input type="checkbox" value="blood"> Immune globulin or blood products</label>
+            <label><input type="checkbox" value="perinatal"> Low birth weight or maternal hepatitis B concern</label>
+            <label><input type="checkbox" value="immune"> Immunocompromise, pregnancy or high-risk condition</label>
+            <label><input type="checkbox" value="reaction"> Prior serious reaction, allergy or intussusception</label>
+            <label><input type="checkbox" value="other"> Illness, prior immunity, foreign records or another factor</label>
+          </fieldset>
+        </div>
+        <p class="form-error" role="alert" id="planner-error"></p>
+        <div class="form-actions"><button class="primary" type="submit">Check vaccine timing <span aria-hidden="true">→</span></button><button type="button" class="quiet" id="load-example">Try a fictional example</button></div>
+      </form>
+      <section id="plan-results" class="plan-results" aria-labelledby="plan-title" hidden>
+        <div class="result-title"><div><h2 id="plan-title" tabindex="-1">Timing at this visit</h2><p id="plan-subtitle"></p></div></div>
+        <p class="guidance">A minimum date answers “how early?” The usual date helps decide when to schedule. A clinician should verify this planning aid’s results against the source schedule and the patient record before a dose is given.</p>
+        <div id="plan-advisories"></div>
+        <div id="timing-overview"></div>
+        <details id="visit-builder" class="visit-builder" hidden><summary>Build a catch-up plan across vaccines</summary>
+          <p>Choose the series to include. The starting selection includes those meeting usual timing at this visit. Each date assumes the selected doses were given at the earlier visits shown.</p>
+          <fieldset><legend>Series to plan</legend><div id="visit-options"></div></fieldset>
+          <div class="field wide"><label for="visit-strategy">Timing to illustrate</label><select id="visit-strategy"><option value="usual">Usual timing or catch-up if behind</option><option value="minimum">Earliest permitted timing</option></select></div>
+          <div id="visit-timeline" aria-live="polite"></div>
+          <p class="field-help">Dates cover up to one year. MMR and varicella are planned as separate products. Future HepB doses assume the standard pediatric formulation. Future rotavirus and Hib products are treated as unknown. Seasonal and clinician-review items are handled separately.</p>
+        </details>
+        <article class="tool-panel series-panel">
+          <div class="field wide"><label for="series-choice">Explore one vaccine series</label><select id="series-choice"></select></div>
+          <div id="series-detail" aria-live="polite"></div>
+        </article>
+      </section>
+      <section class="source" aria-labelledby="planner-source"><h2 id="planner-source">How timing is calculated</h2><p>For children from birth through age 18. Rules checked November 19, 2026. The planner compares the dates you enter with the 2026 AAP schedule and checks the spacing of injectable and intranasal live vaccines. Oral rotavirus uses its own rules. Each result gives the applicable source. Use the clinical review guidance for complex histories and for seasons or products the planner cannot resolve.</p>
+        <div class="source-links"><a href="https://downloads.aap.org/AAP/PDF/AAP-Immunization-Schedule.pdf">AAP schedule, catch-up table and notes ↗</a><a href="https://eziz.cdph.ca.gov/training/resources/recs/">California schedules and recommendations ↗</a><a href="https://www.cdc.gov/vaccines/hcp/imz-best-practices/timing-spacing-immunobiologics.html">Live-vaccine spacing guidance ↗</a></div>
+      </section>
+      <noscript><p class="message">Enable JavaScript to check dates or use the linked AAP catch-up table.</p></noscript>
+    </main>
+    <footer><span>Well-Child Vaccine Timing</span><a href="index.html">Back to routine visits</a></footer>
+  </div>
+</body>
+</html>
