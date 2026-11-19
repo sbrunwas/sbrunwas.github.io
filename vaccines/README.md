@@ -16,7 +16,7 @@ versioned to this chart, not represented as current-year guidance. The online PD
 - Conditional RSV reference below 8 months; optional HPV start at age 9.
 - The separate catch-up planner checks dated doses, minimum and usual dates, live-vaccine spacing, selected products and proposed visits for ages 0–18 using the linked 2026 AAP schedule. It can project a single series or group selected series into visits over one year.
 - Missing records, special situations, ambiguous historical doses and seasonal guidance can require clinical review. A clinician should verify the printed source criteria before administering a dose. New dose entry and forecast rules belong in `planner-rules.js`, with corresponding boundary tests.
-- The evidence library includes vaccine-specific family questions, study populations, absolute event rates and source links. The impact charts label surveillance denominators, study populations and periods.
+- The evidence library includes vaccine-specific family questions, study populations, absolute event rates and source links. Every listed immunization has an impact graph. The explorer includes separate outcomes for combination vaccines and labels the study design, population, periods and units. Chart data and source links live in `impact-data.js`. Link to `evidence.html#impact-mmr/mumps` to share a specific outcome.
 - The individual planner runs same-origin scripts, blocks network connections and form submissions, and stores the record only in memory. Reload or Clear patient starts a fresh record.
 - No API keys, backend, cookies, or stored patient data. Optional aggregate page-view
   analytics on the public GitHub host never read the age controls; the private Sites host is excluded.
@@ -42,7 +42,7 @@ follow GitHub commits; republish after updating this directory.
 
 ```sh
 node tests/vaccines.cjs
-node --test tests/planner-*.test.js
+node --test tests/*.test.js
 node --check vaccines/app.js
 ```
 

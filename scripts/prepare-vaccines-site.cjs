@@ -15,7 +15,7 @@ fs.copyFileSync(path.join(root, 'assets/js/site-analytics.js'), path.join(target
 const publicAssets = [
   'index.html', 'styles.css', 'schedule.js', 'app.js', 'cdph-imm-395-2025.png',
   'planner.html', 'planner-rules.js', 'planner-forecast.js', 'planner.js', 'tools.css',
-  'evidence.html', 'evidence.js', 'vaccine-evidence.js', 'impact.js', 'impact.css'
+  'evidence.html', 'evidence.js', 'vaccine-evidence.js', 'impact-data.js', 'impact.js', 'impact.css'
 ];
 for (const file of publicAssets) {
   fs.copyFileSync(path.join(source, file), path.join(target, 'dist', file));

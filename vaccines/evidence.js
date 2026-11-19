@@ -24,9 +24,11 @@
     a.dataset.id = id;
     nav.append(a);
   }
+  let currentId;
   function render() {
-    const requested = location.hash.slice(1);
-    const id = ids.includes(requested) ? requested : 'hepb';
+    const {vaccineId: id} = window.VaccineImpactSelection();
+    if (currentId === id) return;
+    currentId = id;
     const data = entries[id];
     const vaccine = catalog[id];
     picker.value = id;
@@ -38,18 +40,13 @@
     const intro = el('header','','evidence-intro');
     intro.style.setProperty('--accent',vaccine.color);
     intro.append(el('p',vaccine.code,'vaccine-code'),el('h2',vaccine.name),el('p',data.why));
-    const jump = link('See population impact graphs ↓','#vaccine-impact');
-    // The disease trend section has its own selection; keep the current evidence record when scrolling.
-    jump.addEventListener('click',event => {
-      event.preventDefault();
-      const section = document.getElementById('vaccine-impact');
-      const topic = {hepb:'Hepatitis B',varicella:'Chickenpox',pcv:'Pneumococcal disease',rv:'Rotavirus',dtap:'Whooping cough',tdap:'Whooping cough'}[id];
-      const select = section.querySelector('select');
-      const option = select && Array.from(select.options).find(o => o.text === topic);
-      if (option) { select.value = option.value; select.dispatchEvent(new Event('change')); }
-      section.scrollIntoView();
-      section.setAttribute('tabindex','-1');
-      section.focus({preventScroll:true});
+    const jump = link('Explore disease impact graphs ↓', '#impact-' + id);
+    jump.addEventListener('click', () => {
+      if (location.hash === jump.hash) {
+        const section = document.getElementById('vaccine-impact');
+        section.scrollIntoView();
+        section.focus({preventScroll: true});
+      }
     });
     intro.append(jump);
     article.append(intro);
