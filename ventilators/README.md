@@ -26,3 +26,5 @@ The evidence panel separates sourced clinical principles from assumed scenario p
 Tests compare PC with the analytical exponential and C×ΔP solutions, check VC delivery and pressure limits, air trapping and expiratory time, triggering and backup, adaptive pressure convergence/rate limits, Auto transitions, treatment directionality, holds, and numerical stability across all cases/modes. These are software/mechanics checks, not clinical validation.
 
 Playback starts and resets at 1× real time. Accelerated playback is explicitly labeled. The selectable 6/12-second waveform window controls horizontal scale independently of playback speed. Hidden tabs do not advance or catch up. The animation test verifies equal elapsed simulation time at 60 Hz and 120 Hz and reset/hidden-tab behavior.
+
+The compact desktop layout (1100 px wide and above, 650 px tall and above) places estimated gases above the monitor and shows all controls in the selected Ventilator, Patient or Interventions tab. Case descriptions and patient model notes expand on demand. Smaller screens retain a scrollable layout for readability.
