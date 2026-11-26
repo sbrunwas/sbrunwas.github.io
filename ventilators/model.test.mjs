@@ -1,0 +1,19 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {Simulator,cases} from './model.mjs';
+const passive={mode:'AC',spontRate:0,effort:0,weight:2,compliance:.5,resistance:100,heterogeneity:1,peep:5,recruit:5,pin:10,rate:20,ti:.4,rise:.01};
+function run(over={},sec=45){const s=new Simulator({...passive,...over});s.advance(sec);return s;}
+test('PC reaches the analytical two-unit exponential volume',()=>{const s=new Simulator(passive),m=s.mechanics();s.start('Mandatory');s.advance(.2);const c=m.cTotal,tau=m.c[0]*m.r[0];const expected=c*10*(1-Math.exp(-(.2-.005)/tau));assert.ok(Math.abs(s.volume-expected)<.08,`${s.volume} vs ${expected}`);});
+test('steady passive PC volume follows C × delta pressure',()=>{const s=run({ti:.8,rate:12});assert.ok(Math.abs(s.metrics.vt-10)<.05);const lower=run({compliance:.25,ti:.8,rate:12});assert.ok(Math.abs(lower.metrics.vt-5)<.05);});
+test('VC conserves target inspired volume and raises pressure with resistance',()=>{const a=run({type:'VC',vt:5});const b=run({type:'VC',vt:5,resistance:220});assert.ok(Math.abs(a.metrics.vti-10)<.1);assert.ok(Math.abs(b.metrics.vti-10)<.1);assert.ok(b.metrics.pip>a.metrics.pip);});
+test('VC pressure limit constrains delivered volume',()=>{const s=run({type:'VC',vt:12,compliance:.2,pmax:18});assert.ok(s.metrics.pip<=18);assert.ok(s.metrics.vti<24);});
+test('obstruction and insufficient expiration cause intrinsic PEEP',()=>{const slow=run({compliance:1,resistance:220,heterogeneity:4,rate:55,ti:.6});const longer=run({compliance:1,resistance:220,heterogeneity:4,rate:15,ti:.6});assert.ok(slow.metrics.auto>2);assert.ok(longer.metrics.auto<slow.metrics.auto);});
+test('PRVC and volume support converge toward target volume',()=>{for(const mode of ['PRVC','V+']){const s=run({mode,vt:5,spontRate:30,effort:2,apnea:3},90);assert.ok(Math.abs(s.metrics.vt/s.s.weight-5)<.6,mode);assert.ok(s.adaptive>=s.s.pmin);assert.ok(s.adaptive<=s.s.pmax-s.s.peep);}});
+test('AVAPS support pressure adapts slowly and is used for PS breaths',()=>{const s=run({mode:'AVAPS',spontRate:30,effort:2,vt:4,pin:15},60);assert.ok(s.adaptive<15&&s.adaptive>=12.9);const ps=s.breaths.filter(b=>b.kind==='PS');assert.ok(ps.length>0);assert.ok(ps.at(-1).pip<20);});
+test('A/C triggering increases rate; absent effort still receives backup',()=>{const a=run({spontRate:45,effort:3});const b=run({spontRate:0,effort:0});assert.ok(a.metrics.rr>40);assert.ok(Math.abs(b.metrics.rr-20)<.2);});
+test('Auto switches to PS and returns to timed ventilation after apnea',()=>{const s=run({mode:'Auto',spontRate:40,effort:3},20);assert.ok(s.autoPS);s.effects.paralysis=true;s.advance(10);assert.equal(s.autoPS,false);assert.ok(s.breaths.slice(-2).every(b=>b.kind==='Mandatory'));});
+test('surfactant increases fixed-PC volume; bronchodilator lowers time constant',()=>{const s=run();const before=s.metrics.vt,m=s.mechanics();s.effects.surfactant=true;s.advance(25);assert.ok(s.metrics.vt>before*1.4);s.effects.bronchodilator=true;assert.ok(s.mechanics().rTotal<m.rTotal);});
+test('hold produces finite pressure and terminates',()=>{const s=new Simulator(passive);s.holdRequest=true;s.advance(1);assert.ok(s.held);assert.equal(s.holding,false);assert.ok(s.held.paw>5&&s.held.paw<15);});
+test('every mode and clinical case remains finite, bounded, and ventilates',()=>{for(const c of Object.values(cases))for(const mode of ['AC','SIMV','PRVC','V+','Auto','AVAPS','CPAP']){const s=new Simulator({...c.settings,mode});s.advance(35);for(const [k,v]of Object.entries(s.metrics))assert.ok(Number.isFinite(v),`${c.name}/${mode}/${k}`);assert.ok(s.metrics.vt>=0);assert.ok(s.metrics.sat>=0&&s.metrics.sat<=100);assert.ok(s.metrics.pip<=s.s.pmax+.01);assert.ok(s.breaths.length>0);}});
+
+test("VC delivery remains accurate for time constants shorter than the time step",()=>{const s=run({type:"VC",weight:.4,compliance:.1,resistance:5,vt:5,pmax:60});assert.ok(Math.abs(s.metrics.vti-2)<.04);});
