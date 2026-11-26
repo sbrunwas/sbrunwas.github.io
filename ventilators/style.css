@@ -2,3 +2,4 @@
 /* Keep canvas intrinsic dimensions from expanding the instrument grid. */
 .screen-body{grid-template-rows:minmax(0,1fr)}.waveforms,.loops,.readouts{min-height:0}.graph canvas{position:absolute;inset:0}.readout{min-height:0}
 @media(max-width:600px){.screen-body{grid-template-rows:auto 390px auto}.screen-nav{display:flex;flex-direction:row;grid-column:1 / -1;overflow-x:auto;height:45px;padding:0;gap:3px}.screen-nav button{min-width:49px;font-size:7px;flex:1}.screen-nav button b{font-size:14px;margin-bottom:1px}.waveforms,.loops{height:390px}.readouts{grid-template-rows:repeat(3,66px)}.readout{min-height:0}.readout:nth-child(1),.readout:nth-child(3){grid-row:auto}}
+.screen-status #runState.accelerated{color:#ffe18b;background:#684e2d;padding:4px 6px;border-radius:3px}.play-controls{flex-wrap:wrap}.play-controls #sweep{font-size:12px}.time-label{height:28px}.graph canvas{touch-action:pan-y}

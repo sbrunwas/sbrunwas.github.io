@@ -6,7 +6,7 @@ Buildless, browser-only NICU/PICU educational ventilator simulator, styled after
 
 From the repository root: `python3 -m http.server 8765`, then open `http://localhost:8765/ventilators/`.
 
-Tests: `node --test ventilators/model.test.mjs`.
+Tests: `node --test ventilators/model.test.mjs ventilators/timing.test.mjs`.
 
 - `model.mjs`: deterministic two-compartment mechanics, breath scheduling, adaptive pressure and illustrative gas exchange.
 - `app.mjs`: controls, live canvas waveforms/loops, scenario feedback and downloadable session JSON.
@@ -24,3 +24,5 @@ The evidence panel separates sourced clinical principles from assumed scenario p
 ## Verification
 
 Tests compare PC with the analytical exponential and C×ΔP solutions, check VC delivery and pressure limits, air trapping and expiratory time, triggering and backup, adaptive pressure convergence/rate limits, Auto transitions, treatment directionality, holds, and numerical stability across all cases/modes. These are software/mechanics checks, not clinical validation.
+
+Playback starts and resets at 1× real time. Accelerated playback is explicitly labeled. The selectable 6/12-second waveform window controls horizontal scale independently of playback speed. Hidden tabs do not advance or catch up. The animation test verifies equal elapsed simulation time at 60 Hz and 120 Hz and reset/hidden-tab behavior.
