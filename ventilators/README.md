@@ -28,3 +28,13 @@ Tests compare PC with the analytical exponential and C×ΔP solutions, check VC 
 Playback starts and resets at 1× real time. Accelerated playback is explicitly labeled. The selectable 6/12-second waveform window controls horizontal scale independently of playback speed. Hidden tabs do not advance or catch up. The animation test verifies equal elapsed simulation time at 60 Hz and 120 Hz and reset/hidden-tab behavior.
 
 The compact desktop layout (1100 px wide and above, 650 px tall and above) places estimated gases above the monitor and shows all controls in the selected Ventilator, Patient or Interventions tab. Case descriptions and patient model notes expand on demand. Smaller screens retain a scrollable layout for readability.
+
+## Challenge Yourself and sampled gases
+
+Clinical Examples retains the named scenarios. Challenge Yourself randomly selects one of four concealed problems (surfactant deficiency, bronchospasm, secretion-related obstruction, excessive support after improved compliance). History, settings and waveforms remain available; editable patient mechanics, the scenario identity in diagnostic state, and session export are hidden until completion or answer reveal. This is classroom concealment in a client-side app, not secure exam software. Baseline mechanics/gases are equilibrated for 60 simulated seconds before the challenge clock starts at zero.
+
+The learner records a working diagnosis, applies an intervention and/or adjusts support, and requests a gas. Completion requires the right working diagnosis, appropriate intervention without unrelated treatment toggles, three consecutive breath volumes in range, pressure/emptying goals, oxygen limits, a post-change gas sample no older than 60 seconds, and 10 continuous simulated seconds meeting the goals. Success reveals the explanation; manual answer reveal is labeled incomplete. Challenges are deliberately modeled patterns, not validation that ventilator waveforms can uniquely diagnose a disease.
+
+The Get a gas button stores an immutable snapshot with sample time. Values do not update automatically, including while settings or treatments change. A new case clears the sample. The baseline comparison uses sampled gas values rather than streaming hidden gas estimates.
+
+Run all checks with `node --test ventilators/*.test.mjs`.
