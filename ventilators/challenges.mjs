@@ -1,5 +1,6 @@
 // Scenario assumptions and scoring for an educational model, not diagnostic validation.
 import {cases} from './model.mjs';
+import {monitorProfile} from './monitor.mjs?v=monitor-7';
 import {currentGas} from './gas.mjs';
 export const challenges = [
  {id:'surfactant-deficiency',diagnosis:'Surfactant-deficient neonatal RDS',context:'A 28-week, 1.1 kg infant requires invasive support soon after birth. Oxygen need has persisted despite a patent airway. Use the pressure needed to deliver volume, the loops, and the gas.',settings:{...cases.rds.settings,mode:'PRVC',rate:35,spontRate:0,effort:0},treatment:'surfactant',targets:{vt:[4,6],co2:[40,65],sat:[90,96],pip:18,auto:2,fio2:60},explanation:'Surfactant deficiency made the modeled lungs stiff. Surfactant increased compliance and reduced shunt; volume-targeted support could then deliver the target volume with less pressure. Fixed PC would require manual pressure reduction. The effect size is an assumption, not a clinical prediction.'},
@@ -7,21 +8,24 @@ export const challenges = [
  {id:'airway-secretions',diagnosis:'Secretion-related airway obstruction',context:'A 4 kg infant had been stable on these settings. Peak pressure has increased, coarse sounds are reported, and thick material is visible in the tube. Check delivery and emptying before simply raising the pressure limit.',settings:{weight:4,compliance:.8,resistance:260,heterogeneity:2,mode:'AC',type:'VC',vt:6,rate:35,ti:.4,pin:10,peep:5,spontRate:0,effort:0,shunt:12,fio2:35,deadspace:2.2,pmax:30},treatment:'suction',targets:{vt:[5,7],co2:[32,60],sat:[92,98],pip:28,auto:1.5,fio2:45},explanation:'The scenario assumed removable secretions were increasing airway resistance. Airway clearance reduced modeled peak pressure and improved emptying without increasing the volume target or pressure ceiling. Actual suspected tube obstruction requires an airway assessment; this simplified toggle cannot represent all causes or procedures.'},
  {id:'excess-support',diagnosis:'Excessive support after improved compliance',context:'A 1.1 kg preterm infant has improving oxygenation after treatment, but support has not been weaned and the gas is alkalemic. Compare the delivered volume with body weight. Decide whether a drug or a setting change is needed.',settings:{...cases.rds.settings,mode:'AC',rate:35,spontRate:0,effort:0},effects:{surfactant:true},targets:{vt:[4,6],co2:[40,65],sat:[90,96],pip:20,auto:2,fio2:60},explanation:'Compliance improved while fixed inspiratory pressure remained high, producing excessive tidal volume and ventilation. Reducing PC, or selecting an appropriate volume target with adaptive pressure, corrected the model. Lowering rate alone could change CO₂ without correcting excessive volume per breath.'}
 ];
+challenges.push({id:'excess-peep',diagnosis:'Excessive distending pressure with impaired perfusion',context:'A 1.1 kg preterm infant has better oxygenation after recent ventilator adjustments, but pulses feel weaker. Compare systemic blood pressure with airway pressure, delivered volume, and SpO₂ before increasing support further.',settings:{...cases.rds.settings,mode:'PRVC',rate:35,peep:15,spontRate:0,effort:0,monitor:{hr:155,map:34,pulse:22,minMap:28}},effects:{surfactant:true},action:'reduce-peep',targets:{vt:[4,6],co2:[40,65],sat:[90,96],pip:25,auto:2,fio2:60,mapMin:28},explanation:'In this scenario, excessive distending pressure reduced modeled perfusion despite acceptable oxygenation. Reducing PEEP while reassessing oxygenation, volume, and systemic MAP restored the model goals. This is one illustrative heart–lung interaction, not a rule that PEEP always reduces blood pressure; other causes of low perfusion require assessment.'});
 export const diagnosisOptions=challenges.map(({id,diagnosis})=>({id,label:diagnosis}));
 export function chooseChallenge(previousId,random=Math.random){const pool=challenges.filter(c=>c.id!==previousId);return pool[Math.min(pool.length-1,Math.floor(random()*pool.length))];}
 export class ChallengeSession {
  constructor(definition){this.definition=definition;this.answer=null;this.state='active';this.stableSince=null;this.stableSeconds=0;this.feedback='Choose a working diagnosis, treat and adjust support, then get a gas. Goals must remain satisfied for 10 simulated seconds.';}
  submit(id){if(this.state!=='active')return;this.answer=id||null;this.stableSince=null;this.stableSeconds=0;this.feedback=id?'Working diagnosis recorded. Use the interventions and ventilator controls, then watch the response.':'Choose a working diagnosis first.';}
  reveal(){if(this.state!=='active')return;this.state='revealed';this.stableSince=null;this.stableSeconds=0;this.feedback='Answer revealed — this attempt was not completed.';}
- evaluate(sim,gas){
+ evaluate(sim,gas,vitals){
  if(this.state!=='active')return [];
  const c=this.definition,t=c.targets,m=sim.metrics,recent=sim.breaths.slice(-3);
  const within=(v,r)=>Number.isFinite(v)&&v>=r[0]&&v<=r[1];
  const allowed=new Set([c.treatment,...Object.keys(c.effects||{})].filter(Boolean));
- const treated=c.treatment?!!sim.effects[c.treatment]:(sim.s.pin<c.settings.pin||['PRVC','V+','AVAPS'].includes(sim.s.mode)||sim.s.type==='VC');
+ const treated=c.action==='reduce-peep'?sim.s.peep<=8:c.treatment?!!sim.effects[c.treatment]:(sim.s.pin<c.settings.pin||['PRVC','V+','AVAPS'].includes(sim.s.mode)||sim.s.type==='VC');
  const action=treated&&Object.entries(c.effects||{}).every(([k,on])=>sim.effects[k]===on)&&!Object.entries(sim.effects).some(([k,on])=>on&&!allowed.has(k));
  const checks=[
  ['Working diagnosis recorded',!!this.answer],
+ [`Systemic MAP ≥${t.mapMin??monitorProfile(sim.s).minMap} mmHg`,!!vitals&&vitals.map>=(t.mapMin??monitorProfile(sim.s).minMap)],
+ [`Live SpO₂ ${t.sat[0]}–${t.sat[1]}%`,!!vitals&&within(vitals.spo2,t.sat)],
  ['Gas sampled after changes (within 60 s)',currentGas(gas,sim)],
  ['Appropriate intervention / adjustment',action],
  [`Last 3 VT ${t.vt[0]}–${t.vt[1]} mL/kg`,recent.length===3&&recent.every(b=>within(b.vte/sim.s.weight,t.vt))],

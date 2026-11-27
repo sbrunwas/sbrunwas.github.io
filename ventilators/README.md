@@ -31,7 +31,7 @@ The compact desktop layout (1100 px wide and above, 650 px tall and above) place
 
 ## Challenge Yourself and sampled gases
 
-Clinical Examples retains the named scenarios. Challenge Yourself randomly selects one of four concealed problems (surfactant deficiency, bronchospasm, secretion-related obstruction, excessive support after improved compliance). History, settings and waveforms remain available; editable patient mechanics, the scenario identity in diagnostic state, and session export are hidden until completion or answer reveal. This is classroom concealment in a client-side app, not secure exam software. Baseline mechanics/gases are equilibrated for 60 simulated seconds before the challenge clock starts at zero.
+Clinical Examples retains the named scenarios. Challenge Yourself randomly selects one of five concealed problems (surfactant deficiency, bronchospasm, secretion-related obstruction, excessive support after improved compliance, excessive distending pressure with impaired perfusion). History, settings and waveforms remain available; editable patient mechanics, the scenario identity in diagnostic state, and session export are hidden until completion or answer reveal. This is classroom concealment in a client-side app, not secure exam software. Baseline mechanics/gases are equilibrated for 60 simulated seconds before the challenge clock starts at zero.
 
 The learner records a working diagnosis, applies an intervention and/or adjusts support, and requests a gas. Completion requires the right working diagnosis, appropriate intervention without unrelated treatment toggles, three consecutive breath volumes in range, pressure/emptying goals, oxygen limits, a post-change gas sample no older than 60 seconds, and 10 continuous simulated seconds meeting the goals. Success reveals the explanation; manual answer reveal is labeled incomplete. Challenges are deliberately modeled patterns, not validation that ventilator waveforms can uniquely diagnose a disease.
 
@@ -40,3 +40,9 @@ The Get a gas button stores an immutable snapshot with sample time. Values do no
 Run all checks with `node --test ventilators/*.test.mjs`.
 
 Loops retain every integration sample (≤2 ms), separate from the 16 ms time-waveform history. Pressure-targeted breaths use a smoothstep inspiratory rise and a finite expiratory pressure decay (12 ms time constant). This simplified controller transition avoids an instantaneous pressure dump; it is not a validated valve model. Constant-flow VC retains its ideal switching edges. No spline smoothing or synthesized loop contours are used.
+
+## Bedside monitor
+
+The top monitor shows live HR, illustrative arterial systolic/diastolic BP, systemic MAP (mmHg), SpO₂ and total delivered breath rate. This is separate from discrete gas sampling. Monitor state advances with simulated time and pauses with the patient. The profile uses explicit scenario baselines, not age-normal tables. Pressure load, hypoxemia, hypercapnia and sedation produce bounded, delayed heuristic responses. BP is constructed to satisfy MAP = (SBP + 2 DBP)/3; this is not an integrated cardiovascular model. See the evidence panel for the exact assumptions.
+
+Challenge scoring now requires scenario-specific systemic MAP and live SpO₂ goals. The fifth hidden problem demonstrates impaired perfusion after excessive distending pressure; lowering PEEP must restore perfusion while preserving oxygenation/ventilation. Monitor snapshots and the last minute of vital history are included in session export.
