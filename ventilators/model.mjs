@@ -27,14 +27,14 @@ export class Simulator {
  if(!rate)this.nextEffort=this.t+.05;
  const phase=(this.t-this.effortStart)/this.s.neuralTi; return amp*(phase>=0&&phase<=1?Math.sin(Math.PI*phase):0);
  }
- start(kind,triggered=false){const s=this.s;this.finishCycle();this.insp=true;this.holding=false;this.startTime=this.t;this.lastStart=this.t;this.kind=kind;this.triggered=triggered;this.baseV=this.v.reduce((a,b)=>a+b,0);this.baseUnits=[...this.v];this.peak=0;this.peakFlow=0;this.inVolume=0;this.exhaled=0;this.loop=[];
+ start(kind,triggered=false){const s=this.s;this.finishCycle();this.insp=true;this.holding=false;this.startTime=this.t;this.lastStart=this.t;this.kind=kind;this.triggered=triggered;this.baseV=this.v.reduce((a,b)=>a+b,0);this.baseUnits=[...this.v];this.peak=0;this.peakFlow=0;this.inVolume=0;this.exhaled=0;this.loop=[{t:this.t,p:this.paw,f:this.flow*.06,v:0,mus:0,kind}];
  const m=this.mechanics();this.autoAtStart=(this.v[0]/m.c[0]*m.c[0]+this.v[1]/m.c[1]*m.c[1])/m.cTotal;
  this.breathPressure=['PRVC','V+','AVAPS'].includes(s.mode)?this.adaptive:(kind==='PS'?s.ps:s.pin);
  this.isVC=s.type==='VC'&&kind!=='PS'&&!['PRVC','V+','AVAPS'].includes(s.mode);
  this.nextMandatory=this.t+Math.max(60/s.rate,s.ti+.15);
  if(triggered)this.lastTriggered=this.t;
  }
- endInspiration(){this.insp=false;this.holding=false;const m=this.mechanics();const endV=this.v.reduce((a,b)=>a+b,0);const vt=Math.max(0,endV-this.baseV);const plat=this.s.peep+endV/m.cTotal;
+ endInspiration(){this.expirationStart=this.t;this.expirationPressure=this.paw;this.insp=false;this.holding=false;const m=this.mechanics();const endV=this.v.reduce((a,b)=>a+b,0);const vt=Math.max(0,endV-this.baseV);const plat=this.s.peep+endV/m.cTotal;
  this.pending={t:this.t,vt,vti:this.inVolume,pip:this.peak,auto:this.autoAtStart,plat,dp:Math.max(0,plat-this.s.peep-this.autoAtStart),kind:this.kind};
  if(['PRVC','V+','AVAPS'].includes(this.s.mode)){
  const error=this.s.vt*this.s.weight-vt; const adjustment=error/m.cTotal;
@@ -61,7 +61,10 @@ export class Simulator {
  if(due){this.start('Mandatory');if(spontaneous)this.kind='Apnea backup';}
  }}
  const elapsed=this.t-(this.startTime??this.t);let target=s.peep;
- if(this.insp){target=s.peep+this.breathPressure*clamp(elapsed/Math.max(.01,s.rise),0,1);}
+ // Finite exhaust response for pressure-targeted breaths (12 ms time constant).
+ // VC retains its ideal prescribed-flow switching behavior.
+ if(!this.insp&&!this.isVC&&this.expirationStart!==undefined){target=s.peep+Math.max(0,this.expirationPressure-s.peep)*Math.exp(-(this.t-this.expirationStart)/.012);}
+ if(this.insp){target=s.peep+this.breathPressure*((u)=>u*u*(3-2*u))(clamp(elapsed/Math.max(.01,s.rise),0,1));}
  const gains=m.c.map((c,i)=>1-Math.exp(-dt/(m.r[i]*c)));
  if(this.holding){const eq=(this.v[0]*gains[0]+this.v[1]*gains[1])/(m.c[0]*gains[0]+m.c[1]*gains[1]);target=s.peep+eq-mus;}
  else if(this.insp&&this.isVC){const desired=s.vt*s.weight/Math.max(.1,s.ti);const gain=m.c[0]*gains[0]+m.c[1]*gains[1];target=s.peep-mus+(desired*dt+this.v[0]*gains[0]+this.v[1]*gains[1])/gain;}
@@ -72,7 +75,9 @@ export class Simulator {
  const support=this.kind==='PS';const cycle=support&&elapsed>Math.max(.12,s.rise+.03)&&flow<=this.peakFlow*s.cycle/100;
  if(!this.holding&&(elapsed>=s.ti||cycle)){if(this.holdRequest){this.holding=true;this.holdRequest=false;this.holdEnd=this.t+.4;}else this.endInspiration();}
  if(this.holding&&this.t>=this.holdEnd){this.held={paw:this.paw,effort:mus,t:this.t};this.endInspiration();}
- }else this.exhaled+=Math.max(0,-flow)*dt;
+ }else{this.exhaled+=Math.max(0,-flow)*dt;
+ if(this.pending&&flow>0){this.pending.vti+=flow*dt;this.pending.vt=Math.max(this.pending.vt,this.volume-this.baseV);}
+ }
  // Ventilation estimate from completed cycles; breath interval includes expiration.
  const recent=this.breaths.filter(b=>this.t-b.t<15);const span=recent.length>1?recent.at(-1).t-recent[0].t:0;
  const rr=span>0?(recent.length-1)*60/span:recent.length?60/Math.max(.5,this.t-this.lastStart):0;
@@ -88,7 +93,11 @@ export class Simulator {
  let lo=.1,hi=713;for(let j=0;j<24;j++){let mid=(lo+hi)/2;if(content(mid)>ca)hi=mid;else lo=mid;}
  const pa=(lo+hi)/2;this.metrics.pao2+=(pa-this.metrics.pao2)*(1-Math.exp(-dt/12));this.metrics.sat=100*sat(this.metrics.pao2);
  this.metrics.ph=6.1+Math.log10(24/(.03*this.metrics.co2));this.metrics.rr=rr;this.metrics.mv=avg*rr/1000;this.metrics.va=va;this.metrics.map+=(this.paw-this.metrics.map)*(1-Math.exp(-dt/4));
- if(this.t-this.lastSample>=.016){const p={t:this.t,p:this.paw,f:flow*.06,v:Math.max(0,this.volume-(this.baseV??0)),mus,kind:this.kind};this.trace.push(p);this.loop.push(p);if(this.loop.length>2000)this.loop.shift();this.trace=this.trace.filter(p=>this.t-p.t<16);this.lastSample=this.t;}
+ // Loops use every integrated point; time traces retain a lighter 16 ms history.
+ const p={t:this.t,p:this.paw,f:flow*.06,v:Math.max(0,this.volume-(this.baseV??0)),mus,kind:this.kind};
+ this.loop.push(p);if(this.loop.length>20000)this.loop.shift();
+ if(this.t-this.lastSample>=.016){this.trace.push(p);this.trace=this.trace.filter(p=>this.t-p.t<16);this.lastSample=this.t;}
+
  }
  advance(seconds){const n=Math.ceil(seconds/.002);for(let i=0;i<n;i++)this.step(seconds/n);}
 }

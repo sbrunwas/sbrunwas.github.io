@@ -15,7 +15,7 @@ Tests: `node --test ventilators/model.test.mjs ventilators/timing.test.mjs`.
 
 ## What is modeled
 
-Two parallel linear resistance/compliance units, advanced using exponential pressure solutions at 2 ms steps. Patient effort is an imposed sinusoid. Pressure control, pressure support, pressure-limited volume control, simplified SIMV synchronization and A/C triggering, volume-targeted adaptive pressure, illustrative Auto switching, AVAPS-like slow adaptation and apnea backup are implemented. Residual compartment volume causes intrinsic PEEP. Heterogeneity is the ratio of slow to fast time constants. There is no leak, circuit compliance, flow limitation/choke point, valve dynamics, HFOV, NAVA or hemodynamic model.
+Two parallel linear resistance/compliance units, advanced using exponential pressure solutions at 2 ms steps. Patient effort is an imposed sinusoid. Pressure control, pressure support, pressure-limited volume control, simplified SIMV synchronization and A/C triggering, volume-targeted adaptive pressure, illustrative Auto switching, AVAPS-like slow adaptation and apnea backup are implemented. Residual compartment volume causes intrinsic PEEP. Heterogeneity is the ratio of slow to fast time constants. There is no leak, circuit compliance, flow limitation/choke point, detailed valve dynamics, HFOV, NAVA or hemodynamic model.
 
 Recruitment/overdistension and treatment effects are explicit heuristics. Gas exchange uses alveolar ventilation, CO₂ production, an approximate alveolar gas equation, oxygen-content shunt mixing and a Hill curve, with fixed mixed venous saturation and bicarbonate. It cannot predict patient blood gases. No gas readouts are shown before three completed breaths or when alveolar ventilation is near zero. Values use a recent breath window and change over simulated time; allow at least 30–60 simulated seconds after a setting change. VTi/VTe are integrated over each cycle, and volume waveforms are relative to breath-start volume. Estimated plateau and driving pressure are model-derived, not dynamically measured plateau pressures.
 
@@ -38,3 +38,5 @@ The learner records a working diagnosis, applies an intervention and/or adjusts 
 The Get a gas button stores an immutable snapshot with sample time. Values do not update automatically, including while settings or treatments change. A new case clears the sample. The baseline comparison uses sampled gas values rather than streaming hidden gas estimates.
 
 Run all checks with `node --test ventilators/*.test.mjs`.
+
+Loops retain every integration sample (≤2 ms), separate from the 16 ms time-waveform history. Pressure-targeted breaths use a smoothstep inspiratory rise and a finite expiratory pressure decay (12 ms time constant). This simplified controller transition avoids an instantaneous pressure dump; it is not a validated valve model. Constant-flow VC retains its ideal switching edges. No spline smoothing or synthesized loop contours are used.

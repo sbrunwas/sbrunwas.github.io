@@ -1,4 +1,4 @@
-import {Simulator,cases,clamp} from './model.mjs';
+import {Simulator,cases,clamp} from './model.mjs?v=loops-6';
 import {sampleGas,currentGas} from './gas.mjs';
 import {ChallengeSession,chooseChallenge,diagnosisOptions} from './challenges.mjs';
 const $=id=>document.getElementById(id);
@@ -47,7 +47,7 @@ function axes(ctx,w,h,xmin,xmax,ymin,ymax,xLabel='',yLabel=''){const left=32,rig
  const ySteps=h<125?2:4;for(let i=0;i<=ySteps;i++){const yy=top+hh*i/ySteps;ctx.beginPath();ctx.moveTo(left,yy);ctx.lineTo(left+ww,yy);ctx.stroke();ctx.textAlign='right';ctx.fillText(fmt(ymax-(ymax-ymin)*i/ySteps,0),left-5,yy+3);}
  if(ymin<0){ctx.strokeStyle='#9cbbd36b';ctx.beginPath();ctx.moveTo(left,y(0));ctx.lineTo(left+ww,y(0));ctx.stroke();}
  return{x,y,left,top,ww,hh};}
-function path(ctx,points,ax,keyX,keyY,color,alpha=1){if(points.length<2)return;ctx.save();ctx.beginPath();ctx.rect(ax.left,ax.top,ax.ww,ax.hh);ctx.clip();ctx.globalAlpha=alpha;ctx.strokeStyle=color;ctx.lineWidth=1.7;ctx.lineJoin='round';ctx.beginPath();points.forEach((p,i)=>{const x=ax.x(typeof keyX==='function'?keyX(p):p[keyX]),y=ax.y(p[keyY]);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();ctx.restore();}
+function path(ctx,points,ax,keyX,keyY,color,alpha=1){if(points.length<2)return;ctx.save();ctx.beginPath();ctx.rect(ax.left,ax.top,ax.ww,ax.hh);ctx.clip();ctx.globalAlpha=alpha;ctx.strokeStyle=color;ctx.lineWidth=1.7;ctx.lineJoin='round';ctx.lineCap='round';ctx.beginPath();points.forEach((p,i)=>{const x=ax.x(typeof keyX==='function'?keyX(p):p[keyX]),y=ax.y(p[keyY]);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();ctx.restore();}
 function draw(){const src=frozenTrace||sim;const points=src.trace;const windowSeconds=Number($('sweep').value);const recent=points.filter(p=>p.t>=src.t-windowSeconds);const maxP=Math.max(30,Math.ceil(Math.max(...recent.map(p=>p.p),sim.metrics.pip)/10)*10),maxV=Math.max(sim.s.weight*10,Math.ceil(Math.max(...points.map(p=>p.v),sim.metrics.vt)*1.2/10)*10),maxF=Math.max(.5,...points.map(p=>Math.abs(p.f)))*1.2;
  const scales={p:[0,maxP],f:[-maxF,maxF],v:[0,maxV]};for(const [id,key,color] of [['pressure','p','#ffe18b'],['flow','f','#4ce4bd'],['volume','v','#59dcff']]){const {ctx,w,h}=setupCanvas(id),[lo,hi]=scales[key],ax=axes(ctx,w,h,-windowSeconds,0,lo,hi,'seconds');path(ctx,recent,ax,p=>p.t-Math.max(windowSeconds,src.t),key,color);}
  const loops=src.loops.slice(-3);for(const [id,xkey,ykey,xmax,ymin,ymax]of [['pv','p','v',maxP,0,maxV],['fv','v','f',maxV,-maxF,maxF]]){const {ctx,w,h}=setupCanvas(id),ax=axes(ctx,w,h,0,xmax,ymin,ymax,'x');if(savedLoop)path(ctx,savedLoop,ax,xkey,ykey,'#f2b5db',.85);loops.forEach((l,i)=>path(ctx,l,ax,xkey,ykey,'#75d9fa',.12+i*.12));path(ctx,src.loop,ax,xkey,ykey,'#8ae9ff');}
