@@ -46,3 +46,7 @@ Loops retain every integration sample (≤2 ms), separate from the 16 ms time-wa
 The top monitor shows live HR, illustrative arterial systolic/diastolic BP, systemic MAP (mmHg), SpO₂ and total delivered breath rate. This is separate from discrete gas sampling. Monitor state advances with simulated time and pauses with the patient. The profile uses explicit scenario baselines, not age-normal tables. Pressure load, hypoxemia, hypercapnia and sedation produce bounded, delayed heuristic responses. BP is constructed to satisfy MAP = (SBP + 2 DBP)/3; this is not an integrated cardiovascular model. See the evidence panel for the exact assumptions.
 
 Challenge scoring now requires scenario-specific systemic MAP and live SpO₂ goals. The fifth hidden problem demonstrates impaired perfusion after excessive distending pressure; lowering PEEP must restore perfusion while preserving oxygenation/ventilation. Monitor snapshots and the last minute of vital history are included in session export.
+
+## Stable instrument geometry
+
+The viewport-sized desktop ventilator frame now targets a 5:4 shape, independently of the learning mode. Clinical example and challenge context live inside the inspector, so selecting modes or expanding descriptions cannot consume the monitor’s height. Tablet instrument frames also use 5:4; phones retain readable stacked plots with identical dimensions across learning environments. Very short windows scroll instead of flattening the instrument. Layout overrides are in `layout.css`.
